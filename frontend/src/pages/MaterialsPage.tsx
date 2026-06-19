@@ -21,8 +21,20 @@ interface Material {
   downloadRoles: string[];
   description: string;
   createdAt: string;
+  version: number;
+  baseName: string;
   referenceCount?: { rehearsals: number; annotations: number; total: number };
   references?: MaterialReference[];
+}
+
+interface DuplicateMaterial {
+  id: number;
+  originalName: string;
+  version: number;
+  baseName: string;
+  size: number;
+  mimeType: string;
+  createdAt: string;
 }
 
 const PRESET_CATEGORIES = ['general', 'script', 'music', 'costume', 'set', 'prop', 'video', 'photo'];
@@ -42,11 +54,19 @@ export default function MaterialsPage() {
   const [uploadDesc, setUploadDesc] = useState('');
   const [uploadDownloadRoles, setUploadDownloadRoles] = useState<string[]>([]);
   const [uploadCustomCat, setUploadCustomCat] = useState('');
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { isDirector, user } = useAuth();
 
   const [detailMaterial, setDetailMaterial] = useState<Material | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string; refs?: { rehearsals: number; annotations: number; total: number } } | null>(null);
+
+  const [duplicateModal, setDuplicateModal] = useState<{
+    filename: string;
+    duplicates: DuplicateMaterial[];
+    pendingFile: File;
+  } | null>(null);
+  const [overwriteTargetId, setOverwriteTargetId] = useState<number | null>(null);
 
   const loadMeta = async () => {
     try {
@@ -69,30 +89,102 @@ export default function MaterialsPage() {
   useEffect(() => { loadMeta(); }, []);
   useEffect(() => { load(); }, [filterCats, filterTags, keyword]);
 
-  const handleUpload = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) return;
-
+  const buildUploadParams = () => {
     let finalCategories = uploadCategories;
     if (uploadCustomCat.trim()) {
       finalCategories = [...uploadCategories, uploadCustomCat.trim()];
     }
-
-    await api.materials.upload(file, {
+    return {
       category: finalCategories[0] || 'general',
       description: uploadDesc,
       categories: finalCategories.join(','),
       tags: uploadTags,
       downloadRoles: uploadDownloadRoles.join(','),
-    });
+    };
+  };
+
+  const resetUploadForm = () => {
     if (fileRef.current) fileRef.current.value = '';
     setUploadDesc('');
     setUploadTags('');
     setUploadCustomCat('');
     setUploadCategories(['general']);
     setUploadDownloadRoles([]);
-    load();
-    loadMeta();
+  };
+
+  const handleUpload = async () => {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return;
+    setUploading(true);
+
+    try {
+      const result = await api.materials.checkDuplicate(file.name);
+      if (result.exists && result.materials.length > 0) {
+        setDuplicateModal({
+          filename: file.name,
+          duplicates: result.materials as DuplicateMaterial[],
+          pendingFile: file,
+        });
+        setOverwriteTargetId(result.materials[result.materials.length - 1].id);
+        setUploading(false);
+        return;
+      }
+
+      await api.materials.upload(file, buildUploadParams());
+      resetUploadForm();
+      load();
+      loadMeta();
+    } catch (e) {
+      alert('上传失败: ' + (e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDuplicateNewVersion = async () => {
+    if (!duplicateModal) return;
+    setUploading(true);
+    try {
+      await api.materials.upload(duplicateModal.pendingFile, {
+        ...buildUploadParams(),
+        onDuplicate: 'new_version',
+      });
+      resetUploadForm();
+      setDuplicateModal(null);
+      setOverwriteTargetId(null);
+      load();
+      loadMeta();
+    } catch (e) {
+      alert('上传失败: ' + (e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDuplicateOverwrite = async () => {
+    if (!duplicateModal || !overwriteTargetId) return;
+    setUploading(true);
+    try {
+      await api.materials.upload(duplicateModal.pendingFile, {
+        ...buildUploadParams(),
+        onDuplicate: 'overwrite',
+        overwriteTargetId,
+      });
+      resetUploadForm();
+      setDuplicateModal(null);
+      setOverwriteTargetId(null);
+      load();
+      loadMeta();
+    } catch (e) {
+      alert('覆盖失败: ' + (e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDuplicateCancel = () => {
+    setDuplicateModal(null);
+    setOverwriteTargetId(null);
   };
 
   const handleDeleteClick = async (m: Material) => {
@@ -175,6 +267,24 @@ export default function MaterialsPage() {
     if (mime.startsWith('audio/')) return '🎵';
     if (mime.includes('pdf')) return '📄';
     return '📎';
+  };
+
+  const versionBadge = (version: number) => {
+    if (!version || version <= 1) return null;
+    return (
+      <span style={{
+        fontSize: 10,
+        padding: '1px 6px',
+        borderRadius: 8,
+        background: 'rgba(155, 89, 182, 0.2)',
+        color: '#9b59b6',
+        border: '1px solid rgba(155, 89, 182, 0.4)',
+        marginLeft: 6,
+        fontWeight: 600,
+      }}>
+        v{version}
+      </span>
+    );
   };
 
   return (
@@ -307,7 +417,13 @@ export default function MaterialsPage() {
                 ))}
               </div>
             </div>
-            <button onClick={handleUpload} style={primaryBtnStyle}>上传</button>
+            <button onClick={handleUpload} disabled={uploading} style={{
+              ...primaryBtnStyle,
+              opacity: uploading ? 0.6 : 1,
+              cursor: uploading ? 'not-allowed' : 'pointer',
+            }}>
+              {uploading ? '上传中...' : '上传'}
+            </button>
           </div>
         </div>
       )}
@@ -319,11 +435,12 @@ export default function MaterialsPage() {
               <span style={{ fontSize: 28 }}>{getIcon(m.mimeType)}</span>
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div
-                  style={{ fontSize: 14, color: '#e0e0e0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}
+                  style={{ fontSize: 14, color: '#e0e0e0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                   onClick={() => handleViewDetail(m.id)}
                   title="查看详情"
                 >
-                  {m.originalName}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.originalName}</span>
+                  {versionBadge(m.version)}
                 </div>
                 <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
                   {formatSize(m.size)}
@@ -387,6 +504,119 @@ export default function MaterialsPage() {
       </div>
       {materials.length === 0 && <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>暂无素材</div>}
 
+      {duplicateModal && (
+        <div style={modalOverlayStyle} onClick={handleDuplicateCancel}>
+          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, color: '#e0e0e0', fontSize: 16 }}>⚠️ 检测到同名素材</h3>
+              <button onClick={handleDuplicateCancel} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 20 }}>✕</button>
+            </div>
+
+            <div style={{
+              padding: '12px 16px',
+              background: 'rgba(243, 156, 18, 0.1)',
+              border: '1px solid rgba(243, 156, 18, 0.3)',
+              borderRadius: 8,
+              marginBottom: 16,
+            }}>
+              <div style={{ color: '#f39c12', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                文件「{duplicateModal.filename}」已存在 {duplicateModal.duplicates.length} 个版本
+              </div>
+              <div style={{ color: '#aaa', fontSize: 12 }}>
+                请选择上传方式：创建为新版本，或覆盖已有版本的文件内容
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>已有版本：</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {duplicateModal.duplicates.map((d) => (
+                  <label
+                    key={d.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '8px 12px',
+                      background: overwriteTargetId === d.id ? '#2a1a2a' : '#222',
+                      border: `1px solid ${overwriteTargetId === d.id ? '#9b59b6' : '#333'}`,
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="overwriteTarget"
+                      checked={overwriteTargetId === d.id}
+                      onChange={() => setOverwriteTargetId(d.id)}
+                      style={{ accentColor: '#9b59b6' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: '#e0e0e0', display: 'flex', alignItems: 'center' }}>
+                        {d.originalName}
+                        {versionBadge(d.version)}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                        {formatSize(d.size)} · {new Date(d.createdAt).toLocaleString('zh-CN')}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleDuplicateCancel}
+                style={{
+                  padding: '8px 16px',
+                  background: '#333',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#aaa',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDuplicateOverwrite}
+                disabled={!overwriteTargetId || uploading}
+                style={{
+                  padding: '8px 16px',
+                  background: overwriteTargetId && !uploading ? '#e67e22' : '#555',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#fff',
+                  cursor: overwriteTargetId && !uploading ? 'pointer' : 'not-allowed',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {uploading ? '覆盖中...' : '覆盖所选版本'}
+              </button>
+              <button
+                onClick={handleDuplicateNewVersion}
+                disabled={uploading}
+                style={{
+                  padding: '8px 16px',
+                  background: !uploading ? '#9b59b6' : '#555',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#fff',
+                  cursor: !uploading ? 'pointer' : 'not-allowed',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {uploading ? '创建中...' : '创建为新版本'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {detailMaterial && (
         <div style={modalOverlayStyle} onClick={() => setDetailMaterial(null)}>
           <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
@@ -398,12 +628,29 @@ export default function MaterialsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <span style={{ fontSize: 36 }}>{getIcon(detailMaterial.mimeType)}</span>
               <div>
-                <div style={{ color: '#e0e0e0', fontSize: 15, fontWeight: 600 }}>{detailMaterial.originalName}</div>
+                <div style={{ color: '#e0e0e0', fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                  {detailMaterial.originalName}
+                  {versionBadge(detailMaterial.version)}
+                </div>
                 <div style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
                   {formatSize(detailMaterial.size)} · {detailMaterial.mimeType}
                 </div>
               </div>
             </div>
+
+            {detailMaterial.version > 1 && (
+              <div style={{
+                padding: '8px 12px',
+                background: 'rgba(155, 89, 182, 0.1)',
+                border: '1px solid rgba(155, 89, 182, 0.3)',
+                borderRadius: 6,
+                marginBottom: 12,
+                fontSize: 12,
+                color: '#9b59b6',
+              }}>
+                📌 版本 {detailMaterial.version} · 原始文件名: {detailMaterial.baseName}
+              </div>
+            )}
 
             {detailMaterial.description && (
               <div style={{ color: '#aaa', fontSize: 13, marginBottom: 12 }}>{detailMaterial.description}</div>
@@ -487,7 +734,7 @@ export default function MaterialsPage() {
                 background: canDownload(detailMaterial) ? '#3498db' : '#555',
                 cursor: canDownload(detailMaterial) ? 'pointer' : 'not-allowed',
               }}>
-                {canDownload(detailMaterial) ? '下载' : '🔒 无权限'}
+                {canDownload(detailMaterial) ? `下载${detailMaterial.version > 1 ? ` (v${detailMaterial.version})` : ''}` : '🔒 无权限'}
               </button>
               <button onClick={() => setDetailMaterial(null)} style={{
                 padding: '8px 16px',

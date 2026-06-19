@@ -61,6 +61,14 @@ export class MaterialsController {
     return this.service.getAllTags();
   }
 
+  @Get('check-duplicate')
+  checkDuplicate(@Query('filename') filename: string) {
+    if (!filename) {
+      return { exists: false, materials: [] };
+    }
+    return this.service.checkDuplicate(filename);
+  }
+
   @Get(':id/references')
   getReferences(@Param('id') id: number) {
     return this.service.getReferences(id);
@@ -113,10 +121,13 @@ export class MaterialsController {
     @Query('categories') categoriesStr?: string,
     @Query('tags') tagsStr?: string,
     @Query('downloadRoles') downloadRolesStr?: string,
+    @Query('onDuplicate') onDuplicate?: 'new_version' | 'overwrite',
+    @Query('overwriteTargetId') overwriteTargetIdStr?: string,
   ) {
     const parsedCategories = categoriesStr ? categoriesStr.split(',').map((c) => c.trim()).filter(Boolean) : [];
     const parsedTags = tagsStr ? tagsStr.split(',').map((t) => t.trim()).filter(Boolean) : [];
     const parsedDownloadRoles = downloadRolesStr ? downloadRolesStr.split(',').map((r) => r.trim()).filter(Boolean) : [];
+    const overwriteTargetId = overwriteTargetIdStr ? parseInt(overwriteTargetIdStr, 10) : undefined;
 
     return this.service.create(
       {
@@ -133,6 +144,9 @@ export class MaterialsController {
       },
       req.user.userId,
       req.user.username,
+      onDuplicate,
+      overwriteTargetId,
+      UPLOAD_DIR,
     );
   }
 

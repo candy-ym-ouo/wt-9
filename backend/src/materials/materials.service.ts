@@ -3,12 +3,26 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Material, Rehearsal, Annotation, AuditAction, AuditModule } from '../entities';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { extname, join } from 'path';
+import { unlinkSync, existsSync } from 'fs';
 
 export interface MaterialReference {
   type: 'rehearsal' | 'annotation';
   id: number;
   title: string;
   detail?: string;
+}
+
+export interface DuplicateCheckResult {
+  exists: boolean;
+  materials: Partial<Material>[];
+}
+
+function buildVersionedName(baseName: string, version: number): string {
+  if (version <= 1) return baseName;
+  const ext = extname(baseName);
+  const nameWithoutExt = ext ? baseName.slice(0, -ext.length) : baseName;
+  return `${nameWithoutExt}_v${version}${ext}`;
 }
 
 @Injectable()
@@ -23,13 +37,77 @@ export class MaterialsService {
     private auditLogsService: AuditLogsService,
   ) {}
 
-  async create(data: Partial<Material>, operatorId?: number, operatorName?: string) {
+  async checkDuplicate(filename: string): Promise<DuplicateCheckResult> {
+    let materials = await this.repo
+      .createQueryBuilder('m')
+      .where('m.baseName = :baseName', { baseName: filename })
+      .orderBy('m.version', 'ASC')
+      .getMany();
+
+    if (materials.length === 0) {
+      materials = await this.repo
+        .createQueryBuilder('m')
+        .where('m.baseName IS NULL AND m.originalName = :originalName', { originalName: filename })
+        .orderBy('m.id', 'ASC')
+        .getMany();
+
+      if (materials.length > 0) {
+        for (const m of materials) {
+          m.baseName = m.originalName;
+          if (!m.version) m.version = 1;
+          await this.repo.save(m);
+        }
+      }
+    }
+
+    if (materials.length === 0) {
+      return { exists: false, materials: [] };
+    }
+
+    return {
+      exists: true,
+      materials: materials.map((m) => ({
+        id: m.id,
+        originalName: m.originalName,
+        version: m.version,
+        baseName: m.baseName,
+        size: m.size,
+        mimeType: m.mimeType,
+        createdAt: m.createdAt,
+        storedName: m.storedName,
+      })),
+    };
+  }
+
+  async create(
+    data: Partial<Material>,
+    operatorId?: number,
+    operatorName?: string,
+    onDuplicate?: 'new_version' | 'overwrite',
+    overwriteTargetId?: number,
+    uploadDir?: string,
+  ) {
+    if (!data.baseName) {
+      data.baseName = data.originalName;
+    }
+
+    if (onDuplicate === 'overwrite' && overwriteTargetId) {
+      return this.overwriteMaterial(overwriteTargetId, data, operatorId, operatorName, uploadDir);
+    }
+
+    if (onDuplicate === 'new_version') {
+      return this.createNewVersion(data, operatorId, operatorName);
+    }
+
     const item = this.repo.create(data);
     if (!item.categories || item.categories.length === 0) {
       item.categories = item.category ? [item.category] : ['general'];
     }
     if (!item.tags) item.tags = [];
     if (!item.downloadRoles) item.downloadRoles = [];
+    if (!item.version) item.version = 1;
+    if (!item.baseName) item.baseName = item.originalName;
+
     const saved = await this.repo.save(item);
 
     if (operatorId !== undefined) {
@@ -46,6 +124,112 @@ export class MaterialsService {
           size: saved.size,
           mimeType: saved.mimeType,
           categories: saved.categories,
+          version: saved.version,
+        },
+      });
+    }
+
+    return saved;
+  }
+
+  private async createNewVersion(
+    data: Partial<Material>,
+    operatorId?: number,
+    operatorName?: string,
+  ) {
+    const existing = await this.repo
+      .createQueryBuilder('m')
+      .where('m.baseName = :baseName', { baseName: data.baseName })
+      .orderBy('m.version', 'DESC')
+      .getOne();
+
+    const baseName = data.baseName || data.originalName || '';
+    const newVersion = existing ? existing.version + 1 : 1;
+    const versionedName = buildVersionedName(baseName, newVersion);
+
+    const item = this.repo.create({
+      ...data,
+      originalName: versionedName,
+      version: newVersion,
+    });
+    if (!item.categories || item.categories.length === 0) {
+      item.categories = item.category ? [item.category] : ['general'];
+    }
+    if (!item.tags) item.tags = [];
+    if (!item.downloadRoles) item.downloadRoles = [];
+
+    const saved = await this.repo.save(item);
+
+    if (operatorId !== undefined) {
+      await this.auditLogsService.log({
+        action: AuditAction.CREATE_MATERIAL,
+        module: AuditModule.MATERIAL,
+        operatorId,
+        operatorName,
+        targetId: saved.id,
+        targetType: 'material',
+        detail: `上传素材新版本「${saved.originalName}」(v${saved.version})`,
+        metadata: {
+          originalName: saved.originalName,
+          baseName: saved.baseName,
+          size: saved.size,
+          version: saved.version,
+        },
+      });
+    }
+
+    return saved;
+  }
+
+  private async overwriteMaterial(
+    targetId: number,
+    data: Partial<Material>,
+    operatorId?: number,
+    operatorName?: string,
+    uploadDir?: string,
+  ) {
+    const existing = await this.repo.findOne({ where: { id: targetId } });
+    if (!existing) {
+      throw new HttpException('目标素材不存在', HttpStatus.NOT_FOUND);
+    }
+
+    const oldStoredName = existing.storedName;
+
+    if (uploadDir && oldStoredName) {
+      try {
+        const oldPath = join(uploadDir, oldStoredName);
+        if (existsSync(oldPath)) {
+          unlinkSync(oldPath);
+        }
+      } catch {}
+    }
+
+    existing.storedName = data.storedName!;
+    existing.size = data.size!;
+    existing.mimeType = data.mimeType!;
+    if (data.description !== undefined) existing.description = data.description;
+    if (data.categories) existing.categories = data.categories;
+    if (data.tags) existing.tags = data.tags;
+    if (data.downloadRoles) existing.downloadRoles = data.downloadRoles;
+
+    const saved = await this.repo.save(existing);
+
+    if (operatorId !== undefined) {
+      await this.auditLogsService.log({
+        action: AuditAction.UPDATE_MATERIAL,
+        module: AuditModule.MATERIAL,
+        operatorId,
+        operatorName,
+        targetId: saved.id,
+        targetType: 'material',
+        detail: `覆盖素材「${saved.originalName}」(v${saved.version})`,
+        metadata: {
+          originalName: saved.originalName,
+          baseName: saved.baseName,
+          size: saved.size,
+          version: saved.version,
+          oldStoredName,
+          newStoredName: saved.storedName,
         },
       });
     }

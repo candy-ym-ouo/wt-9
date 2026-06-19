@@ -181,13 +181,17 @@ export const api = {
     },
     get: (id: number) => request<any>(`/materials/${id}`),
     getReferences: (id: number) => request<any[]>(`/materials/${id}/references`),
-    upload: (file: File, params?: { category?: string; description?: string; categories?: string; tags?: string; downloadRoles?: string }) => {
+    checkDuplicate: (filename: string) =>
+      request<{ exists: boolean; materials: any[] }>(`/materials/check-duplicate?filename=${encodeURIComponent(filename)}`),
+    upload: (file: File, params?: { category?: string; description?: string; categories?: string; tags?: string; downloadRoles?: string; onDuplicate?: 'new_version' | 'overwrite'; overwriteTargetId?: number }) => {
       const uploadParams: Record<string, string> = {};
       if (params?.category) uploadParams.category = params.category;
       if (params?.description) uploadParams.description = params.description;
       if (params?.categories) uploadParams.categories = params.categories;
       if (params?.tags) uploadParams.tags = params.tags;
       if (params?.downloadRoles) uploadParams.downloadRoles = params.downloadRoles;
+      if (params?.onDuplicate) uploadParams.onDuplicate = params.onDuplicate;
+      if (params?.overwriteTargetId) uploadParams.overwriteTargetId = String(params.overwriteTargetId);
       return uploadFile('/materials/upload', file, uploadParams);
     },
     update: (id: number, data: any) =>

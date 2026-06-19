@@ -29,7 +29,13 @@ export class Material {
   @Column({ type: 'simple-json', nullable: true, default: '[]' })
   downloadRoles: string[];
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ default: 1 })
+  version: number;
+
+  @Column({ nullable: true })
+  baseName: string;
+
+  @Column({ nullable: true })
   description: string;
 
   @Column({ nullable: true })
