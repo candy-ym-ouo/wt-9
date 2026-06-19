@@ -28,6 +28,13 @@ export interface SearchResultItem {
   raw: any;
 }
 
+const ENTITY_DATE_FIELDS: Record<string, string[]> = {
+  rehearsal: ['startTime', 'createdAt', 'updatedAt'],
+  role: ['createdAt', 'updatedAt'],
+  annotation: ['createdAt', 'updatedAt'],
+  material: ['createdAt', 'updatedAt'],
+};
+
 @Injectable()
 export class SearchService {
   constructor(
@@ -43,6 +50,18 @@ export class SearchService {
     private rolesService: RolesService,
     private annotationsService: AnnotationsService,
   ) {}
+
+  private resolveDateColumn(entityType: string, dateField: string): string {
+    const available = ENTITY_DATE_FIELDS[entityType];
+    if (available.includes(dateField)) return dateField;
+    return 'createdAt';
+  }
+
+  private resolveDateValue(raw: any, entityType: string, dateField: string): Date {
+    const col = this.resolveDateColumn(entityType, dateField);
+    const value = raw[col];
+    return value ? new Date(value) : new Date(raw.createdAt);
+  }
 
   async advancedSearch(params: AdvancedSearchParams) {
     const {
@@ -118,7 +137,7 @@ export class SearchService {
     };
 
     if (!groupByModule) {
-      const flatResults = this.flattenAndSort(result, sortBy, sortOrder, query);
+      const flatResults = this.flattenAndSort(result, sortBy, sortOrder, dateField, query);
       return { ...result, flatResults };
     }
 
@@ -149,7 +168,7 @@ export class SearchService {
     likeQuery: string | null,
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
-    tags?: string[],
+    _tags?: string[],
   ) {
     const whereConditions: any[] = [];
 
@@ -161,7 +180,7 @@ export class SearchService {
       );
     }
 
-    const dateFieldName = dateField === 'startTime' ? 'startTime' : 'createdAt';
+    const dateFieldName = this.resolveDateColumn('rehearsal', dateField);
 
     if (dateRange) {
       if (whereConditions.length === 0) {
@@ -182,7 +201,7 @@ export class SearchService {
     likeQuery: string | null,
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
-    tags?: string[],
+    _tags?: string[],
   ) {
     const whereConditions: any[] = [];
 
@@ -193,7 +212,7 @@ export class SearchService {
       );
     }
 
-    const dateFieldName = 'createdAt';
+    const dateFieldName = this.resolveDateColumn('role', dateField);
 
     if (dateRange) {
       if (whereConditions.length === 0) {
@@ -242,7 +261,7 @@ export class SearchService {
       }
     }
 
-    const dateFieldName = 'createdAt';
+    const dateFieldName = this.resolveDateColumn('annotation', dateField);
 
     if (dateRange) {
       if (whereConditions.length === 0) {
@@ -284,7 +303,7 @@ export class SearchService {
       conditions.push(`(${tagConditions.join(' OR ')})`);
     }
 
-    const dateFieldName = 'createdAt';
+    const dateFieldName = this.resolveDateColumn('material', dateField);
 
     if (dateRange?.from) {
       conditions.push(`m.${dateFieldName} >= :dateFrom`);
@@ -302,7 +321,7 @@ export class SearchService {
     return qb.getMany();
   }
 
-  private flattenAndSort(result: any, sortBy: string, sortOrder: string, query?: string): SearchResultItem[] {
+  private flattenAndSort(result: any, sortBy: string, sortOrder: string, dateField: string, query?: string): SearchResultItem[] {
     const items: SearchResultItem[] = [];
 
     result.rehearsals.forEach((r: any) => {
@@ -311,7 +330,7 @@ export class SearchService {
         type: 'rehearsal',
         title: r.title,
         description: r.description,
-        date: r.startTime ? new Date(r.startTime) : new Date(r.createdAt),
+        date: this.resolveDateValue(r, 'rehearsal', dateField),
         tags: r.location ? [r.location] : [],
         raw: r,
       });
@@ -323,7 +342,7 @@ export class SearchService {
         type: 'role',
         title: r.characterName,
         description: r.characterDescription,
-        date: new Date(r.createdAt),
+        date: this.resolveDateValue(r, 'role', dateField),
         tags: [],
         raw: r,
       });
@@ -335,7 +354,7 @@ export class SearchService {
         type: 'annotation',
         title: a.scriptContent?.substring(0, 50) + '...',
         description: a.note,
-        date: new Date(a.createdAt),
+        date: this.resolveDateValue(a, 'annotation', dateField),
         tags: a.tag ? [a.tag] : [],
         raw: a,
       });
@@ -347,7 +366,7 @@ export class SearchService {
         type: 'material',
         title: m.originalName,
         description: m.description,
-        date: new Date(m.createdAt),
+        date: this.resolveDateValue(m, 'material', dateField),
         tags: m.tags || [],
         raw: m,
       });
