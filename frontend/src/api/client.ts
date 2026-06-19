@@ -147,6 +147,31 @@ export const api = {
   },
   search: {
     query: (q: string) => request<any>(`/search?q=${encodeURIComponent(q)}`),
+    advanced: (params: {
+      q?: string;
+      modules?: string[];
+      dateFrom?: string;
+      dateTo?: string;
+      dateField?: string;
+      tags?: string[];
+      sortBy?: string;
+      sortOrder?: string;
+      groupByModule?: boolean;
+    }) => {
+      const searchParams = new URLSearchParams();
+      if (params.q) searchParams.set('q', params.q);
+      if (params.modules && params.modules.length > 0) searchParams.set('modules', params.modules.join(','));
+      if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
+      if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+      if (params.dateField) searchParams.set('dateField', params.dateField);
+      if (params.tags && params.tags.length > 0) searchParams.set('tags', params.tags.join(','));
+      if (params.sortBy) searchParams.set('sortBy', params.sortBy);
+      if (params.sortOrder) searchParams.set('sortOrder', params.sortOrder);
+      if (params.groupByModule !== undefined) searchParams.set('groupByModule', String(params.groupByModule));
+      const q = searchParams.toString();
+      return request<any>(`/search${q ? '?' + q : ''}`);
+    },
+    getTags: () => request<string[]>('/search/meta/tags'),
   },
   reminders: {
     summary: () => request<any>('/reminders/summary'),
