@@ -5,3 +5,5 @@ export { Annotation } from './annotation.entity';
 export { AnnotationVersion, VersionAction } from './annotation-version.entity';
 export { Material } from './material.entity';
 export { LeaveRequest, LeaveStatus, LeaveType } from './leave.entity';
+export { ReminderConfig, ReminderType, ReminderChannel } from './reminder-config.entity';
+export { Reminder, ReminderStatus } from './reminder.entity';
