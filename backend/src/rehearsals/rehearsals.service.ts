@@ -24,6 +24,35 @@ export interface ParticipantInfo {
   substituteName?: string;
   roleId?: number;
   roleName?: string;
+  attendanceStatus?: 'present' | 'absent' | 'late' | null;
+  absentReason?: string;
+  checkInTime?: string;
+}
+
+export interface AttendanceUpdate {
+  userId: number;
+  status: 'present' | 'absent' | 'late' | null;
+  absentReason?: string;
+}
+
+export interface RehearsalStatistics {
+  totalRehearsals: number;
+  totalParticipants: number;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  pendingCount: number;
+  attendanceRate: number;
+  byUser: Array<{
+    userId: number;
+    userName: string;
+    displayName?: string;
+    total: number;
+    present: number;
+    absent: number;
+    late: number;
+    attendanceRate: number;
+  }>;
 }
 
 @Injectable()
@@ -129,6 +158,7 @@ export class RehearsalsService {
     location?: string;
     participantId?: string;
     timeSlot?: string;
+    attendanceStatus?: string;
   }) {
     let result = await this.repo.find({ order: { startTime: 'ASC' } });
 
@@ -164,6 +194,16 @@ export class RehearsalsService {
           const fStart = startHour * 60 + startMin;
           const fEnd = endHour * 60 + endMin;
           return rStart < fEnd && rEnd > fStart;
+        });
+      }
+    }
+
+    if (filters.attendanceStatus && filters.participantId) {
+      const pid = parseInt(filters.participantId, 10);
+      if (!isNaN(pid)) {
+        result = result.filter((r) => {
+          const attendance = r.attendance?.[pid];
+          return attendance?.status === filters.attendanceStatus;
         });
       }
     }
@@ -252,11 +292,14 @@ export class RehearsalsService {
       }
     });
 
+    const attendance = rehearsal.attendance || {};
+
     const result: ParticipantInfo[] = [];
     for (const userId of participantIds) {
       const user = userMap.get(userId);
       const leave = activeLeaves.find((l) => l.actorId === userId);
       const role = roleByActor.get(userId);
+      const userAttendance = attendance[userId];
 
       let substituteId: number | undefined;
       let substituteName: string | undefined;
@@ -287,6 +330,9 @@ export class RehearsalsService {
         substituteName,
         roleId: role?.id,
         roleName: role?.characterName,
+        attendanceStatus: userAttendance?.status ?? null,
+        absentReason: userAttendance?.absentReason,
+        checkInTime: userAttendance?.checkInTime,
       });
     }
 
@@ -299,12 +345,20 @@ export class RehearsalsService {
       const participants = await this.getParticipantsWithLeaveInfo(r);
       const onLeaveCount = participants.filter((p) => p.isOnLeave).length;
       const withSubstituteCount = participants.filter((p) => p.substituteId).length;
+      const presentCount = participants.filter((p) => p.attendanceStatus === 'present').length;
+      const absentCount = participants.filter((p) => p.attendanceStatus === 'absent').length;
+      const lateCount = participants.filter((p) => p.attendanceStatus === 'late').length;
+      const pendingAttendanceCount = participants.filter((p) => !p.attendanceStatus).length;
 
       result.push({
         ...r,
         participants,
         onLeaveCount,
         withSubstituteCount,
+        presentCount,
+        absentCount,
+        lateCount,
+        pendingAttendanceCount,
         effectiveParticipants: participants
           .map((p) => (p.isOnLeave && p.substituteId ? p.substituteId : p.userId))
           .filter((id, index, arr) => arr.indexOf(id) === index),
@@ -321,5 +375,121 @@ export class RehearsalsService {
     const enriched = await this.enrichWithParticipantInfo([rehearsal]);
     const withConflict = await this.enrichWithConflictInfo([rehearsal]);
     return { ...enriched[0], ...withConflict[0] };
+  }
+
+  async updateAttendance(id: number, updates: AttendanceUpdate[]) {
+    const existing = await this.repo.findOne({ where: { id } });
+    if (!existing) {
+      throw new BadRequestException('排练不存在');
+    }
+
+    const currentAttendance = existing.attendance || {};
+    const newAttendance = { ...currentAttendance };
+
+    for (const update of updates) {
+      if (!existing.participantIds?.includes(update.userId)) {
+        continue;
+      }
+      newAttendance[update.userId] = {
+        status: update.status,
+        absentReason: update.absentReason,
+        checkInTime: update.status === 'present' || update.status === 'late'
+          ? new Date().toISOString()
+          : undefined,
+      };
+    }
+
+    await this.repo.update(id, { attendance: newAttendance });
+    return this.findOneWithDetails(id);
+  }
+
+  async getStatistics(start?: string, end?: string): Promise<RehearsalStatistics> {
+    let rehearsals = await this.repo.find({ order: { startTime: 'ASC' } });
+
+    if (start && end) {
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      rehearsals = rehearsals.filter((r) =>
+        this.isTimeOverlap(startDate, endDate, r.startTime, r.endTime),
+      );
+    }
+
+    let totalParticipants = 0;
+    let presentCount = 0;
+    let absentCount = 0;
+    let lateCount = 0;
+    let pendingCount = 0;
+
+    const userStats = new Map<number, {
+      userId: number;
+      userName: string;
+      displayName?: string;
+      total: number;
+      present: number;
+      absent: number;
+      late: number;
+    }>();
+
+    const allUsers = await this.userRepo.find();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+    for (const rehearsal of rehearsals) {
+      const participantIds = rehearsal.participantIds || [];
+      const attendance = rehearsal.attendance || {};
+
+      for (const userId of participantIds) {
+        totalParticipants++;
+        const status = attendance[userId]?.status;
+
+        if (status === 'present') {
+          presentCount++;
+        } else if (status === 'absent') {
+          absentCount++;
+        } else if (status === 'late') {
+          lateCount++;
+        } else {
+          pendingCount++;
+        }
+
+        if (!userStats.has(userId)) {
+          const user = userMap.get(userId);
+          userStats.set(userId, {
+            userId,
+            userName: user?.username || `user_${userId}`,
+            displayName: user?.displayName,
+            total: 0,
+            present: 0,
+            absent: 0,
+            late: 0,
+          });
+        }
+
+        const stat = userStats.get(userId)!;
+        stat.total++;
+        if (status === 'present') stat.present++;
+        else if (status === 'absent') stat.absent++;
+        else if (status === 'late') stat.late++;
+      }
+    }
+
+    const byUser = Array.from(userStats.values()).map((s) => ({
+      ...s,
+      attendanceRate: s.total > 0 ? ((s.present + s.late * 0.5) / s.total) * 100 : 0,
+    }));
+
+    const attendanceRate = totalParticipants > 0
+      ? ((presentCount + lateCount * 0.5) / totalParticipants) * 100
+      : 0;
+
+    return {
+      totalRehearsals: rehearsals.length,
+      totalParticipants,
+      presentCount,
+      absentCount,
+      lateCount,
+      pendingCount,
+      attendanceRate,
+      byUser,
+    };
   }
 }

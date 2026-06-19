@@ -27,9 +27,16 @@ interface Rehearsal {
     substituteName?: string;
     roleId?: number;
     roleName?: string;
+    attendanceStatus?: 'present' | 'absent' | 'late' | null;
+    absentReason?: string;
+    checkInTime?: string;
   }>;
   onLeaveCount?: number;
   withSubstituteCount?: number;
+  presentCount?: number;
+  absentCount?: number;
+  lateCount?: number;
+  pendingAttendanceCount?: number;
   effectiveParticipants?: number[];
 }
 
@@ -70,6 +77,7 @@ interface Filters {
   participantId: number | null;
   timeSlotStart: string;
   timeSlotEnd: string;
+  attendanceStatus: string;
 }
 
 const emptyFilters: Filters = {
@@ -77,6 +85,7 @@ const emptyFilters: Filters = {
   participantId: null,
   timeSlotStart: '',
   timeSlotEnd: '',
+  attendanceStatus: '',
 };
 
 export default function CalendarPage() {
@@ -90,6 +99,9 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [showFilters, setShowFilters] = useState(false);
+  const [expandedRehearsalId, setExpandedRehearsalId] = useState<number | null>(null);
+  const [attendanceEdits, setAttendanceEdits] = useState<Record<number, { status: 'present' | 'absent' | 'late' | null; absentReason?: string }>>({});
+  const [savingAttendance, setSavingAttendance] = useState(false);
   const { user, isDirector, isAdmin } = useAuth();
 
   const load = async () => {
@@ -99,15 +111,82 @@ export default function CalendarPage() {
     if (filters.timeSlotStart && filters.timeSlotEnd) {
       params.timeSlot = `${filters.timeSlotStart}-${filters.timeSlotEnd}`;
     }
+    if (filters.attendanceStatus && filters.participantId) {
+      params.attendanceStatus = filters.attendanceStatus;
+    }
     const data = await api.rehearsals.list(params);
     setRehearsals(data);
   };
 
   const hasActiveFilters =
-    filters.location || filters.participantId || (filters.timeSlotStart && filters.timeSlotEnd);
+    filters.location || filters.participantId || (filters.timeSlotStart && filters.timeSlotEnd) || filters.attendanceStatus;
 
   const resetFilters = () => {
     setFilters(emptyFilters);
+  };
+
+  const toggleAttendanceExpand = (rehearsalId: number) => {
+    if (expandedRehearsalId === rehearsalId) {
+      setExpandedRehearsalId(null);
+      setAttendanceEdits({});
+    } else {
+      setExpandedRehearsalId(rehearsalId);
+      const rehearsal = rehearsals.find((r) => r.id === rehearsalId);
+      if (rehearsal?.participants) {
+        const edits: Record<number, { status: 'present' | 'absent' | 'late' | null; absentReason?: string }> = {};
+        rehearsal.participants.forEach((p) => {
+          edits[p.userId] = {
+            status: p.attendanceStatus ?? null,
+            absentReason: p.absentReason,
+          };
+        });
+        setAttendanceEdits(edits);
+      }
+    }
+  };
+
+  const updateAttendanceEdit = (userId: number, field: string, value: any) => {
+    setAttendanceEdits((prev) => ({
+      ...prev,
+      [userId]: {
+        ...prev[userId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveAttendance = async (rehearsalId: number) => {
+    setSavingAttendance(true);
+    try {
+      const updates = Object.entries(attendanceEdits).map(([userId, edit]) => ({
+        userId: Number(userId),
+        status: edit.status,
+        absentReason: edit.absentReason,
+      }));
+      const updated = await api.rehearsals.updateAttendance(rehearsalId, updates);
+      setRehearsals((prev) =>
+        prev.map((r) => (r.id === rehearsalId ? updated : r))
+      );
+      setExpandedRehearsalId(null);
+      setAttendanceEdits({});
+    } catch (e: any) {
+      console.error('保存签到失败', e);
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
+
+  const getAttendanceStatusLabel = (status?: 'present' | 'absent' | 'late' | null) => {
+    switch (status) {
+      case 'present':
+        return { text: '出勤', color: '#2ecc71', bg: 'rgba(46, 204, 113, 0.15)' };
+      case 'absent':
+        return { text: '缺席', color: '#e74c3c', bg: 'rgba(231, 76, 60, 0.15)' };
+      case 'late':
+        return { text: '迟到', color: '#f39c12', bg: 'rgba(243, 156, 18, 0.15)' };
+      default:
+        return { text: '未签到', color: '#888', bg: 'rgba(136, 136, 136, 0.15)' };
+    }
   };
 
   const loadUsers = async () => {
@@ -308,48 +387,62 @@ export default function CalendarPage() {
               </select>
             </div>
             <div>
-              <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>⏰ 时间段开始</div>
-              <input
-                type="time"
-                value={filters.timeSlotStart}
-                onChange={(e) => setFilters({ ...filters, timeSlotStart: e.target.value })}
-                style={inputStyle}
-              />
+              <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>✅ 签到状态</div>
+              <select
+                value={filters.attendanceStatus}
+                onChange={(e) => setFilters({ ...filters, attendanceStatus: e.target.value })}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                <option value="">全部状态</option>
+                <option value="present">出勤</option>
+                <option value="absent">缺席</option>
+                <option value="late">迟到</option>
+              </select>
             </div>
             <div>
-              <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>⏰ 时间段结束</div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>⏰ 时间段</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="time"
+                  value={filters.timeSlotStart}
+                  onChange={(e) => setFilters({ ...filters, timeSlotStart: e.target.value })}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <span style={{ color: '#666' }}>-</span>
                 <input
                   type="time"
                   value={filters.timeSlotEnd}
                   onChange={(e) => setFilters({ ...filters, timeSlotEnd: e.target.value })}
                   style={{ ...inputStyle, flex: 1 }}
                 />
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    style={{
-                      padding: '8px 12px',
-                      background: 'transparent',
-                      border: '1px solid #666',
-                      borderRadius: 6,
-                      color: '#888',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                    }}
-                  >
-                    重置
-                  </button>
-                )}
               </div>
             </div>
           </div>
-          {hasActiveFilters && (
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #333', color: '#666', fontSize: 13 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid #333' }}>
+            <div style={{ color: '#666', fontSize: 13 }}>
               当前筛选结果：<span style={{ color: '#3498db' }}>{rehearsals.length}</span> 条排练
+              {filters.attendanceStatus && !filters.participantId && (
+                <span style={{ color: '#e67e22', marginLeft: 8 }}>⚠️ 请先选择演员再按签到状态筛选</span>
+              )}
             </div>
-          )}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                style={{
+                  padding: '6px 12px',
+                  background: 'transparent',
+                  border: '1px solid #666',
+                  borderRadius: 6,
+                  color: '#888',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                重置筛选
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -495,6 +588,153 @@ export default function CalendarPage() {
                 {r.participantIds && r.participantIds.length > 0 && (
                   <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
                     👥 {r.participantIds.map((id) => getUserName(id)).join('、')}
+                  </div>
+                )}
+
+                {r.participants && r.participants.length > 0 && (
+                  <div style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    background: 'rgba(52, 152, 219, 0.06)',
+                    border: '1px solid rgba(52, 152, 219, 0.2)',
+                    borderRadius: 6,
+                    fontSize: 12,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ color: '#3498db', fontWeight: 600 }}>
+                        签到: 出勤{r.presentCount || 0} | 缺席{r.absentCount || 0} | 迟到{r.lateCount || 0} | 未签{r.pendingAttendanceCount || 0}
+                      </div>
+                      {canEdit && (
+                        <button
+                          onClick={() => toggleAttendanceExpand(r.id)}
+                          style={{
+                            padding: '2px 8px',
+                            background: 'transparent',
+                            border: '1px solid #3498db',
+                            borderRadius: 4,
+                            color: '#3498db',
+                            cursor: 'pointer',
+                            fontSize: 11,
+                          }}
+                        >
+                          {expandedRehearsalId === r.id ? '收起' : '管理签到'}
+                        </button>
+                      )}
+                    </div>
+
+                    {expandedRehearsalId === r.id && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(52, 152, 219, 0.2)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {r.participants.map((p) => (
+                            <div key={p.userId} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              padding: '6px 8px',
+                              background: '#222',
+                              borderRadius: 4,
+                            }}>
+                              <div style={{ flex: 1, color: '#e0e0e0' }}>
+                                {p.displayName || p.userName}
+                                <span style={{ color: '#666', marginLeft: 6, fontSize: 11 }}>
+                                  ({p.roleName || '演员'})
+                                </span>
+                                {p.isOnLeave && (
+                                  <span style={{
+                                    marginLeft: 8,
+                                    padding: '1px 6px',
+                                    background: 'rgba(230, 126, 34, 0.2)',
+                                    border: '1px solid #e67e22',
+                                    borderRadius: 8,
+                                    color: '#e67e22',
+                                    fontSize: 10,
+                                  }}>
+                                    请假中
+                                  </span>
+                                )}
+                              </div>
+                              <select
+                                value={attendanceEdits[p.userId]?.status ?? ''}
+                                onChange={(e) => updateAttendanceEdit(p.userId, 'status', e.target.value || null)}
+                                style={{
+                                  padding: '4px 8px',
+                                  background: '#1a1a1a',
+                                  border: '1px solid #444',
+                                  borderRadius: 4,
+                                  color: '#e0e0e0',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <option value="">未签到</option>
+                                <option value="present">出勤</option>
+                                <option value="late">迟到</option>
+                                <option value="absent">缺席</option>
+                              </select>
+                              {attendanceEdits[p.userId]?.status === 'absent' && (
+                                <input
+                                  placeholder="缺席原因"
+                                  value={attendanceEdits[p.userId]?.absentReason || ''}
+                                  onChange={(e) => updateAttendanceEdit(p.userId, 'absentReason', e.target.value)}
+                                  style={{
+                                    flex: 1,
+                                    padding: '4px 8px',
+                                    background: '#1a1a1a',
+                                    border: '1px solid #444',
+                                    borderRadius: 4,
+                                    color: '#e0e0e0',
+                                    fontSize: 12,
+                                  }}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                          <button
+                            onClick={() => toggleAttendanceExpand(r.id)}
+                            style={{
+                              padding: '6px 14px',
+                              background: 'transparent',
+                              border: '1px solid #555',
+                              borderRadius: 4,
+                              color: '#aaa',
+                              cursor: 'pointer',
+                              fontSize: 12,
+                            }}
+                          >
+                            取消
+                          </button>
+                          <button
+                            onClick={() => saveAttendance(r.id)}
+                            disabled={savingAttendance}
+                            style={{
+                              padding: '6px 14px',
+                              background: '#2ecc71',
+                              border: 'none',
+                              borderRadius: 4,
+                              color: '#fff',
+                              cursor: savingAttendance ? 'not-allowed' : 'pointer',
+                              fontSize: 12,
+                              opacity: savingAttendance ? 0.6 : 1,
+                            }}
+                          >
+                            {savingAttendance ? '保存中...' : '保存签到'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {expandedRehearsalId !== r.id && r.participants.filter((p) => p.attendanceStatus === 'absent').length > 0 && (
+                      <div style={{ marginTop: 6 }}>
+                        {r.participants.filter((p) => p.attendanceStatus === 'absent').map((p) => (
+                          <div key={p.userId} style={{ color: '#e74c3c', marginTop: 2, fontSize: 11 }}>
+                            • {p.displayName || p.userName} 缺席
+                            {p.absentReason && `：${p.absentReason}`}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

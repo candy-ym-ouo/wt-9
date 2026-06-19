@@ -23,6 +23,13 @@ export class Rehearsal {
   @Column({ type: 'simple-json', nullable: true })
   participantIds: number[];
 
+  @Column({ type: 'simple-json', nullable: true })
+  attendance: Record<number, {
+    status: 'present' | 'absent' | 'late' | null;
+    absentReason?: string;
+    checkInTime?: string;
+  }>;
+
   @Column({ nullable: true })
   createdBy: number;
 

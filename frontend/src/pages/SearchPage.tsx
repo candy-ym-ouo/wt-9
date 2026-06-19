@@ -529,6 +529,15 @@ export default function SearchPage() {
                         {r.location && ` · 📍 ${r.location}`}
                       </div>
                       {r.description && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{r.description}</div>}
+                      {r.participants && r.participants.length > 0 && (
+                        <div style={{
+                          marginTop: 6,
+                          fontSize: 11,
+                          color: '#3498db',
+                        }}>
+                          ✅ 签到: 出勤{r.presentCount || 0} | 缺席{r.absentCount || 0} | 迟到{r.lateCount || 0} | 未签{r.pendingAttendanceCount || 0}
+                        </div>
+                      )}
                       {r.hasConflict && (
                         <div style={{
                           marginTop: 8,

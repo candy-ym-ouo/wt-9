@@ -84,6 +84,7 @@ export const api = {
       location?: string;
       participantId?: number;
       timeSlot?: string;
+      attendanceStatus?: string;
     }) => {
       const searchParams = new URLSearchParams();
       if (params?.start) searchParams.set('start', params.start);
@@ -91,6 +92,7 @@ export const api = {
       if (params?.location) searchParams.set('location', params.location);
       if (params?.participantId) searchParams.set('participantId', String(params.participantId));
       if (params?.timeSlot) searchParams.set('timeSlot', params.timeSlot);
+      if (params?.attendanceStatus) searchParams.set('attendanceStatus', params.attendanceStatus);
       const q = searchParams.toString();
       return request<any[]>(`/rehearsals${q ? '?' + q : ''}`);
     },
@@ -102,6 +104,15 @@ export const api = {
     update: (id: number, data: any) =>
       request<any>(`/rehearsals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) => request<any>(`/rehearsals/${id}`, { method: 'DELETE' }),
+    updateAttendance: (id: number, updates: Array<{ userId: number; status: 'present' | 'absent' | 'late' | null; absentReason?: string }>) =>
+      request<any>(`/rehearsals/${id}/attendance`, { method: 'PUT', body: JSON.stringify({ updates }) }),
+    getStatistics: (params?: { start?: string; end?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.start) searchParams.set('start', params.start);
+      if (params?.end) searchParams.set('end', params.end);
+      const q = searchParams.toString();
+      return request<any>(`/rehearsals/statistics/summary${q ? '?' + q : ''}`);
+    },
   },
   roles: {
     list: () => request<any[]>('/roles'),

@@ -48,6 +48,7 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', role: 'actor', displayName: '' });
   const [leaveStats, setLeaveStats] = useState<any>(null);
+  const [attendanceStats, setAttendanceStats] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
@@ -57,13 +58,15 @@ export default function AdminPage() {
   });
 
   const load = async () => {
-    const [usersData, statsData, logsData] = await Promise.all([
+    const [usersData, statsData, attendanceData, logsData] = await Promise.all([
       api.users.list(),
       api.leaves.statistics(),
+      api.rehearsals.getStatistics(),
       api.auditLogs.list({ limit: 50 }),
     ]);
     setUsers(usersData);
     setLeaveStats(statsData);
+    setAttendanceStats(attendanceData);
     setAuditLogs(logsData);
   };
 
@@ -301,6 +304,106 @@ export default function AdminPage() {
               <div style={statCardStyle}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: '#95a5a6' }}>{leaveStats.byType.other}</div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>其他</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {attendanceStats && (
+        <div style={{ marginTop: 32 }}>
+          <h3 style={{ margin: '0 0 16px', color: '#e0e0e0', fontSize: 16 }}>签到统计</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#3498db' }}>{attendanceStats.totalRehearsals}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>排练总数</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#9b59b6' }}>{attendanceStats.totalParticipants}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>参与人次</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#2ecc71' }}>{attendanceStats.presentCount}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>出勤人次</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#e74c3c' }}>{attendanceStats.absentCount}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>缺席人次</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#f39c12' }}>{attendanceStats.lateCount}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>迟到人次</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#95a5a6' }}>{attendanceStats.pendingCount}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>待签到</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#1abc9c' }}>
+                {attendanceStats.attendanceRate.toFixed(1)}%
+              </div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>出勤率</div>
+            </div>
+          </div>
+
+          {attendanceStats.byUser && attendanceStats.byUser.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <h4 style={{ margin: '0 0 12px', color: '#aaa', fontSize: 14 }}>个人签到排行</h4>
+              <div style={{ background: '#1a1a1a', borderRadius: 8, border: '1px solid #333', overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #333' }}>
+                      <th style={{ ...thStyle, textAlign: 'left' }}>排名</th>
+                      <th style={{ ...thStyle, textAlign: 'left' }}>演员</th>
+                      <th style={{ ...thStyle, textAlign: 'center' }}>参与次数</th>
+                      <th style={{ ...thStyle, textAlign: 'center' }}>出勤</th>
+                      <th style={{ ...thStyle, textAlign: 'center' }}>缺席</th>
+                      <th style={{ ...thStyle, textAlign: 'center' }}>迟到</th>
+                      <th style={{ ...thStyle, textAlign: 'center' }}>出勤率</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...attendanceStats.byUser]
+                      .sort((a: any, b: any) => b.attendanceRate - a.attendanceRate)
+                      .map((u: any, index: number) => (
+                      <tr key={u.userId} style={{ borderBottom: '1px solid #222' }}>
+                        <td style={tdStyle}>
+                          <span style={{
+                            display: 'inline-block',
+                            width: 24,
+                            height: 24,
+                            lineHeight: '24px',
+                            textAlign: 'center',
+                            borderRadius: '50%',
+                            background: index === 0 ? '#f39c12' : index === 1 ? '#95a5a6' : index === 2 ? '#e67e22' : '#333',
+                            color: '#fff',
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}>
+                            {index + 1}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>{u.displayName || u.userName}</td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>{u.total}</td>
+                        <td style={{ ...tdStyle, textAlign: 'center', color: '#2ecc71' }}>{u.present}</td>
+                        <td style={{ ...tdStyle, textAlign: 'center', color: '#e74c3c' }}>{u.absent}</td>
+                        <td style={{ ...tdStyle, textAlign: 'center', color: '#f39c12' }}>{u.late}</td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 10,
+                            background: u.attendanceRate >= 90 ? 'rgba(46, 204, 113, 0.15)' : u.attendanceRate >= 70 ? 'rgba(243, 156, 18, 0.15)' : 'rgba(231, 76, 60, 0.15)',
+                            color: u.attendanceRate >= 90 ? '#2ecc71' : u.attendanceRate >= 70 ? '#f39c12' : '#e74c3c',
+                            fontSize: 11,
+                            fontWeight: 600,
+                          }}>
+                            {u.attendanceRate.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

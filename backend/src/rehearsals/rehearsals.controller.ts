@@ -17,11 +17,12 @@ export class RehearsalsController {
     @Query('location') location?: string,
     @Query('participantId') participantId?: string,
     @Query('timeSlot') timeSlot?: string,
+    @Query('attendanceStatus') attendanceStatus?: string,
   ) {
-    const hasFilters = location || participantId || timeSlot;
+    const hasFilters = location || participantId || timeSlot || attendanceStatus;
     let rehearsals: Rehearsal[];
     if (hasFilters || (start && end)) {
-      rehearsals = await this.service.findWithFilters({ start, end, location, participantId, timeSlot });
+      rehearsals = await this.service.findWithFilters({ start, end, location, participantId, timeSlot, attendanceStatus });
     } else {
       rehearsals = await this.service.findAll();
     }
@@ -113,5 +114,32 @@ export class RehearsalsController {
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   remove(@Param('id') id: number) {
     return this.service.remove(id);
+  }
+
+  @Put(':id/attendance')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  async updateAttendance(
+    @Param('id') id: number,
+    @Body()
+    body: {
+      updates: Array<{
+        userId: number;
+        status: 'present' | 'absent' | 'late' | null;
+        absentReason?: string;
+      }>;
+    },
+  ) {
+    return this.service.updateAttendance(id, body.updates);
+  }
+
+  @Get('statistics/summary')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  getStatistics(
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+  ) {
+    return this.service.getStatistics(start, end);
   }
 }
