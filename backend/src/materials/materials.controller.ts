@@ -36,16 +36,19 @@ export class MaterialsController {
   constructor(private service: MaterialsService) {}
 
   @Get()
-  findAll(
+  async findAll(
     @Query('category') category?: string,
     @Query('categories') categories?: string,
     @Query('tags') tags?: string,
     @Query('keyword') keyword?: string,
   ) {
+    let materials: Material[];
     if (category && !categories) {
-      return this.service.findByCategory(category);
+      materials = await this.service.findByCategory(category);
+    } else {
+      materials = await this.service.findAll({ categories, tags, keyword });
     }
-    return this.service.findAll({ categories, tags, keyword });
+    return this.service.enrichWithReferenceCounts(materials);
   }
 
   @Get('meta/categories')
@@ -56,6 +59,16 @@ export class MaterialsController {
   @Get('meta/tags')
   getTags() {
     return this.service.getAllTags();
+  }
+
+  @Get(':id/references')
+  getReferences(@Param('id') id: number) {
+    return this.service.getReferences(id);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: number) {
+    return this.service.findOneWithReferences(id);
   }
 
   @Get(':id/download')
@@ -73,11 +86,6 @@ export class MaterialsController {
       return res.status(404).json({ message: '文件已被删除' });
     }
     return res.download(filePath, material.originalName);
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: number) {
-    return this.service.findOne(id);
   }
 
   @Post('upload')

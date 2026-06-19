@@ -155,6 +155,7 @@ export const api = {
       return request<any[]>(`/materials${q ? '?' + q : ''}`);
     },
     get: (id: number) => request<any>(`/materials/${id}`),
+    getReferences: (id: number) => request<any[]>(`/materials/${id}/references`),
     upload: (file: File, params?: { category?: string; description?: string; categories?: string; tags?: string; downloadRoles?: string }) => {
       const uploadParams: Record<string, string> = {};
       if (params?.category) uploadParams.category = params.category;

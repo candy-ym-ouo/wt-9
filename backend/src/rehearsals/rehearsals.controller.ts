@@ -73,6 +73,7 @@ export class RehearsalsController {
       endTime: string;
       location?: string;
       participantIds?: number[];
+      materialIds?: number[];
     },
     @Request() req: any,
   ) {
@@ -83,6 +84,7 @@ export class RehearsalsController {
         endTime: new Date(body.endTime),
         createdBy: req.user.userId,
         participantIds: body.participantIds || [],
+        materialIds: body.materialIds || [],
       });
     } catch (e: any) {
       throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
@@ -107,6 +109,7 @@ export class RehearsalsController {
       endTime: string;
       location: string;
       participantIds: number[];
+      materialIds: number[];
     }>,
   ) {
     try {

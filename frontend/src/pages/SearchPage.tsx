@@ -687,7 +687,21 @@ export default function SearchPage() {
                   <h3 style={{ color: '#3498db', fontSize: 15, marginBottom: 12 }}>📁 素材 ({results.materials.length})</h3>
                   {results.materials.map((m: any) => (
                     <div key={m.id} style={cardStyle}>
-                      <strong style={{ color: '#e0e0e0' }}>{m.originalName}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <strong style={{ color: '#e0e0e0' }}>{m.originalName}</strong>
+                        {m.referenceCount && m.referenceCount.total > 0 && (
+                          <span style={{
+                            padding: '2px 8px',
+                            background: 'rgba(243, 156, 18, 0.15)',
+                            border: '1px solid #f39c12',
+                            color: '#f39c12',
+                            borderRadius: 10,
+                            fontSize: 11,
+                          }}>
+                            🔗 {m.referenceCount.total} 次引用
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
                         {m.category} · {(m.size / 1024).toFixed(1)} KB
                       </div>
@@ -708,6 +722,11 @@ export default function SearchPage() {
                               🏷️ {t}
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {m.referenceCount && m.referenceCount.total > 0 && (
+                        <div style={{ fontSize: 11, color: '#f39c12', marginTop: 6 }}>
+                          📅 {m.referenceCount.rehearsals} 个排练 · 📝 {m.referenceCount.annotations} 个批注
                         </div>
                       )}
                     </div>

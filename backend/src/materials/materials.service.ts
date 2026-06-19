@@ -1,13 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Material } from '../entities';
+import { Material, Rehearsal, Annotation } from '../entities';
+
+export interface MaterialReference {
+  type: 'rehearsal' | 'annotation';
+  id: number;
+  title: string;
+  detail?: string;
+}
 
 @Injectable()
 export class MaterialsService {
   constructor(
     @InjectRepository(Material)
     private repo: Repository<Material>,
+    @InjectRepository(Rehearsal)
+    private rehearsalRepo: Repository<Rehearsal>,
+    @InjectRepository(Annotation)
+    private annotationRepo: Repository<Annotation>,
   ) {}
 
   async create(data: Partial<Material>) {
@@ -66,6 +77,58 @@ export class MaterialsService {
     return this.repo.findOne({ where: { id } });
   }
 
+  async findOneWithReferences(id: number) {
+    const material = await this.repo.findOne({ where: { id } });
+    if (!material) return null;
+
+    const references = await this.getReferences(id);
+    return { ...material, references };
+  }
+
+  async getReferences(materialId: number): Promise<MaterialReference[]> {
+    const references: MaterialReference[] = [];
+
+    const rehearsals = await this.rehearsalRepo.find();
+    for (const r of rehearsals) {
+      if (r.materialIds && Array.isArray(r.materialIds) && r.materialIds.includes(materialId)) {
+        references.push({
+          type: 'rehearsal',
+          id: r.id,
+          title: r.title,
+          detail: `${r.startTime ? new Date(r.startTime).toLocaleString('zh-CN') : ''}${r.location ? ' · ' + r.location : ''}`,
+        });
+      }
+    }
+
+    const annotations = await this.annotationRepo.find();
+    for (const a of annotations) {
+      if (a.materialIds && Array.isArray(a.materialIds) && a.materialIds.includes(materialId)) {
+        references.push({
+          type: 'annotation',
+          id: a.id,
+          title: a.scriptContent ? a.scriptContent.substring(0, 50) + (a.scriptContent.length > 50 ? '...' : '') : `批注#${a.id}`,
+          detail: a.note || (a.sceneNumber ? `第${a.sceneNumber}场` : undefined),
+        });
+      }
+    }
+
+    return references;
+  }
+
+  async getReferenceCount(materialId: number): Promise<{ rehearsals: number; annotations: number; total: number }> {
+    const rehearsals = await this.rehearsalRepo.find();
+    const rehearsalCount = rehearsals.filter(
+      (r) => r.materialIds && Array.isArray(r.materialIds) && r.materialIds.includes(materialId),
+    ).length;
+
+    const annotations = await this.annotationRepo.find();
+    const annotationCount = annotations.filter(
+      (a) => a.materialIds && Array.isArray(a.materialIds) && a.materialIds.includes(materialId),
+    ).length;
+
+    return { rehearsals: rehearsalCount, annotations: annotationCount, total: rehearsalCount + annotationCount };
+  }
+
   async canDownload(materialId: number, userRole: string): Promise<boolean> {
     const material = await this.findOne(materialId);
     if (!material) return false;
@@ -79,6 +142,13 @@ export class MaterialsService {
   }
 
   async remove(id: number) {
+    const refCount = await this.getReferenceCount(id);
+    if (refCount.total > 0) {
+      throw new HttpException(
+        `该素材正在被 ${refCount.rehearsals} 个排练和 ${refCount.annotations} 个批注引用，无法删除`,
+        HttpStatus.CONFLICT,
+      );
+    }
     return this.repo.delete(id);
   }
 
@@ -99,5 +169,14 @@ export class MaterialsService {
       if (m.tags) m.tags.forEach((t) => tagSet.add(t));
     });
     return Array.from(tagSet).sort();
+  }
+
+  async enrichWithReferenceCounts(materials: Material[]) {
+    const result: any[] = [];
+    for (const m of materials) {
+      const refCount = await this.getReferenceCount(m.id);
+      result.push({ ...m, referenceCount: refCount });
+    }
+    return result;
   }
 }

@@ -30,6 +30,9 @@ export class Rehearsal {
     checkInTime?: string;
   }>;
 
+  @Column({ type: 'simple-json', nullable: true })
+  materialIds: number[];
+
   @Column({ nullable: true })
   createdBy: number;
 

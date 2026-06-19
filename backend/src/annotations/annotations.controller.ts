@@ -52,6 +52,7 @@ export class AnnotationsController {
       endOffset?: number;
       tag?: string;
       sceneNumber?: number;
+      materialIds?: number[];
     },
     @Request() req: any,
   ) {

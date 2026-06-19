@@ -5,6 +5,7 @@ import { Rehearsal, CastRole, Annotation, Material } from '../entities';
 import { RehearsalsService } from '../rehearsals/rehearsals.service';
 import { RolesService } from '../roles/roles.service';
 import { AnnotationsService } from '../annotations/annotations.service';
+import { MaterialsService } from '../materials/materials.service';
 
 interface AdvancedSearchParams {
   query?: string;
@@ -49,6 +50,7 @@ export class SearchService {
     private rehearsalsService: RehearsalsService,
     private rolesService: RolesService,
     private annotationsService: AnnotationsService,
+    private materialsService: MaterialsService,
   ) {}
 
   private resolveDateColumn(entityType: string, dateField: string): string {
@@ -128,12 +130,14 @@ export class SearchService {
       ? this.annotationsService.searchInScript(query, annotations)
       : annotations.map((a) => ({ ...a, highlights: [] }));
 
+    const enrichedMaterials = await this.materialsService.enrichWithReferenceCounts(materials);
+
     const result = {
       rehearsals: enrichedRehearsals,
       roles: enrichedRoles,
       annotations: highlightedAnnotations,
-      materials,
-      total: enrichedRehearsals.length + enrichedRoles.length + highlightedAnnotations.length + materials.length,
+      materials: enrichedMaterials,
+      total: enrichedRehearsals.length + enrichedRoles.length + highlightedAnnotations.length + enrichedMaterials.length,
     };
 
     if (!groupByModule) {
