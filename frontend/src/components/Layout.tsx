@@ -1,8 +1,10 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../api/client';
 
 const NAV_ITEMS = [
+  { path: '/reminders', label: '排练提醒', icon: '🔔' },
   { path: '/calendar', label: '排练日历', icon: '📅' },
   { path: '/roles', label: '角色分配', icon: '🎭' },
   { path: '/leaves', label: '请假管理', icon: '📝' },
@@ -14,6 +16,22 @@ const NAV_ITEMS = [
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const loadUnreadCount = async () => {
+    try {
+      const res = await api.reminders.unreadCount();
+      setUnreadCount(res.count);
+    } catch {
+      setUnreadCount(0);
+    }
+  };
+
+  useEffect(() => {
+    loadUnreadCount();
+    const interval = setInterval(loadUnreadCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -42,7 +60,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               key={item.path}
               to={item.path}
               style={({ isActive }) => ({
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 padding: '10px 20px',
                 color: isActive ? '#e74c3c' : '#aaa',
                 textDecoration: 'none',
@@ -52,7 +72,21 @@ export default function Layout({ children }: { children: ReactNode }) {
                 transition: 'all 0.2s',
               })}
             >
-              {item.icon} {item.label}
+              <span>{item.icon} {item.label}</span>
+              {item.path === '/reminders' && unreadCount > 0 && (
+                <span style={{
+                  background: '#e74c3c',
+                  color: '#fff',
+                  borderRadius: 10,
+                  padding: '1px 7px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  minWidth: 18,
+                  textAlign: 'center',
+                }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </NavLink>
           ))}
           {isAdmin && (

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
+import RemindersPage from './pages/RemindersPage';
 import CalendarPage from './pages/CalendarPage';
 import RolesPage from './pages/RolesPage';
 import AnnotationsPage from './pages/AnnotationsPage';
@@ -28,7 +29,8 @@ function AppRoutes() {
   const { token } = useAuth();
   return (
     <Routes>
-      <Route path="/login" element={token ? <Navigate to="/calendar" /> : <LoginPage />} />
+      <Route path="/login" element={token ? <Navigate to="/reminders" /> : <LoginPage />} />
+      <Route path="/reminders" element={<ProtectedRoute><RemindersPage /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
       <Route path="/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
       <Route path="/leaves" element={<ProtectedRoute><LeavesPage /></ProtectedRoute>} />
@@ -36,7 +38,7 @@ function AppRoutes() {
       <Route path="/materials" element={<ProtectedRoute><MaterialsPage /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
       <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
-      <Route path="*" element={<Navigate to="/calendar" />} />
+      <Route path="*" element={<Navigate to="/reminders" />} />
     </Routes>
   );
 }

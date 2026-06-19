@@ -53,6 +53,24 @@ export class RemindersController {
     return this.service.getUpcomingRehearsals(req.user.userId, req.user.role, daysNum);
   }
 
+  @Get('configs')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  getConfigs() {
+    return this.service.getConfigs();
+  }
+
+  @Get('configs/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  async getConfig(@Param('id') id: string) {
+    const config = await this.service.getConfig(parseInt(id, 10));
+    if (!config) {
+      throw new HttpException('配置不存在', HttpStatus.NOT_FOUND);
+    }
+    return config;
+  }
+
   @Get()
   async getReminders(
     @Request() req: any,
@@ -77,6 +95,9 @@ export class RemindersController {
   @Get(':id')
   async getReminder(@Param('id') id: string, @Request() req: any) {
     const reminderId = parseInt(id, 10);
+    if (isNaN(reminderId)) {
+      throw new HttpException('无效的提醒ID', HttpStatus.BAD_REQUEST);
+    }
     const { items } = await this.service.getUserReminders(req.user.userId, {});
     const reminder = items.find((r) => r.id === reminderId);
     if (!reminder) {
@@ -85,64 +106,20 @@ export class RemindersController {
     return reminder;
   }
 
-  @Put(':id/read')
-  async markAsRead(@Param('id') id: string, @Request() req: any) {
-    return this.service.markAsRead(parseInt(id, 10), req.user.userId);
-  }
-
   @Put('read-all')
   async markAllAsRead(@Request() req: any) {
     const count = await this.service.markAllAsRead(req.user.userId);
     return { updated: count };
   }
 
+  @Put(':id/read')
+  async markAsRead(@Param('id') id: string, @Request() req: any) {
+    return this.service.markAsRead(parseInt(id, 10), req.user.userId);
+  }
+
   @Put(':id/dismiss')
   async dismissReminder(@Param('id') id: string, @Request() req: any) {
     return this.service.dismissReminder(parseInt(id, 10), req.user.userId);
-  }
-
-  @Post()
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  async createReminder(
-    @Body()
-    body: {
-      userId: number;
-      type: ReminderType;
-      channel?: ReminderChannel;
-      title: string;
-      message: string;
-      metadata?: Record<string, any>;
-      rehearsalId?: number;
-      materialId?: number;
-    },
-  ) {
-    try {
-      return await this.service.createReminder({
-        ...body,
-        channel: body.channel || ReminderChannel.IN_APP,
-      });
-    } catch (e: any) {
-      throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
-    }
-  }
-
-  @Get('configs')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  getConfigs() {
-    return this.service.getConfigs();
-  }
-
-  @Get('configs/:id')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  async getConfig(@Param('id') id: string) {
-    const config = await this.service.getConfig(parseInt(id, 10));
-    if (!config) {
-      throw new HttpException('配置不存在', HttpStatus.NOT_FOUND);
-    }
-    return config;
   }
 
   @Post('configs')
@@ -196,6 +173,32 @@ export class RemindersController {
     try {
       await this.service.deleteConfig(parseInt(id, 10));
       return { success: true };
+    } catch (e: any) {
+      throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post()
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  async createReminder(
+    @Body()
+    body: {
+      userId: number;
+      type: ReminderType;
+      channel?: ReminderChannel;
+      title: string;
+      message: string;
+      metadata?: Record<string, any>;
+      rehearsalId?: number;
+      materialId?: number;
+    },
+  ) {
+    try {
+      return await this.service.createReminder({
+        ...body,
+        channel: body.channel || ReminderChannel.IN_APP,
+      });
     } catch (e: any) {
       throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
     }

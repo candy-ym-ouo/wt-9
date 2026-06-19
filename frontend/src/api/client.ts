@@ -148,6 +148,42 @@ export const api = {
   search: {
     query: (q: string) => request<any>(`/search?q=${encodeURIComponent(q)}`),
   },
+  reminders: {
+    summary: () => request<any>('/reminders/summary'),
+    todayTasks: () => request<any[]>('/reminders/today-tasks'),
+    unreadCount: () => request<{ count: number }>('/reminders/unread-count'),
+    upcoming: (days?: number) => {
+      const params = days ? `?days=${days}` : '';
+      return request<any[]>(`/reminders/upcoming${params}`);
+    },
+    list: (params?: { status?: string; type?: string; limit?: number; offset?: number }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.type) searchParams.set('type', params.type);
+      if (params?.limit) searchParams.set('limit', String(params.limit));
+      if (params?.offset) searchParams.set('offset', String(params.offset));
+      const q = searchParams.toString();
+      return request<{ items: any[]; total: number }>(`/reminders${q ? '?' + q : ''}`);
+    },
+    get: (id: number) => request<any>(`/reminders/${id}`),
+    markAsRead: (id: number) => request<any>(`/reminders/${id}/read`, { method: 'PUT' }),
+    markAllAsRead: () => request<any>('/reminders/read-all', { method: 'PUT' }),
+    dismiss: (id: number) => request<any>(`/reminders/${id}/dismiss`, { method: 'PUT' }),
+    create: (data: any) =>
+      request<any>('/reminders', { method: 'POST', body: JSON.stringify(data) }),
+    configs: {
+      list: () => request<any[]>('/reminders/configs'),
+      get: (id: number) => request<any>(`/reminders/configs/${id}`),
+      create: (data: any) =>
+        request<any>('/reminders/configs', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: number, data: any) =>
+        request<any>(`/reminders/configs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      remove: (id: number) =>
+        request<any>(`/reminders/configs/${id}`, { method: 'DELETE' }),
+    },
+    generateDaily: () => request<any>('/reminders/generate-daily', { method: 'POST' }),
+    initDefaults: () => request<any>('/reminders/init-defaults', { method: 'POST' }),
+  },
   leaves: {
     list: (params?: { actorId?: number; status?: string; roleId?: number; startDate?: string; endDate?: string }) => {
       const searchParams = new URLSearchParams();
