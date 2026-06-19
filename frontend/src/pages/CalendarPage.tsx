@@ -121,9 +121,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     load();
-    if (isDirector || isAdmin) {
-      loadUsers();
-    }
+    loadUsers();
   }, []);
 
   useEffect(() => {

@@ -11,15 +11,11 @@ export class UsersController {
   constructor(private usersService: UsersService) {}
 
   @Get()
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   findAll() {
     return this.usersService.findAll();
   }
 
   @Get(':id')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   findOne(@Param('id') id: number) {
     return this.usersService.findOne(id);
   }
