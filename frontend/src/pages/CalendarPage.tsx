@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -101,6 +102,10 @@ const emptyFilters: Filters = {
 };
 
 export default function CalendarPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rehearsalRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [highlightedRehearsalId, setHighlightedRehearsalId] = useState<number | null>(null);
+
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [materials, setMaterials] = useState<MaterialLite[]>([]);
@@ -229,6 +234,25 @@ export default function CalendarPage() {
   useEffect(() => {
     load();
   }, [filters]);
+
+  useEffect(() => {
+    const rehearsalIdParam = searchParams.get('rehearsalId');
+    if (rehearsalIdParam && rehearsals.length > 0) {
+      const id = Number(rehearsalIdParam);
+      const exists = rehearsals.some((r) => r.id === id);
+      if (exists) {
+        setHighlightedRehearsalId(id);
+        setTimeout(() => {
+          const el = rehearsalRefs.current[id];
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+        setTimeout(() => setHighlightedRehearsalId(null), 3000);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, rehearsals]);
 
   useEffect(() => {
     if (!showForm || !form.startTime || !form.endTime) {
@@ -667,14 +691,23 @@ export default function CalendarPage() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {rehearsals.map((r, idx) => (
-          <div key={r.id} style={{
-            background: '#1a1a1a',
-            borderRadius: 8,
-            border: '1px solid #333',
-            borderLeft: `4px solid ${colorPool[idx % colorPool.length]}`,
-            padding: 16,
-          }}>
+        {rehearsals.map((r, idx) => {
+          const isHighlighted = highlightedRehearsalId === r.id;
+          return (
+            <div
+              key={r.id}
+              ref={(el) => { rehearsalRefs.current[r.id] = el; }}
+              style={{
+                background: '#1a1a1a',
+                borderRadius: 8,
+                border: '1px solid #333',
+                borderLeft: `4px solid ${colorPool[idx % colorPool.length]}`,
+                padding: 16,
+                ...(isHighlighted ? { borderColor: '#f39c12', boxShadow: '0 0 12px rgba(243,156,18,0.4)' } : {}),
+                transition: 'all 0.3s ease',
+                scrollMarginTop: 80,
+              }}
+            >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -924,7 +957,8 @@ export default function CalendarPage() {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         {rehearsals.length === 0 && (
           <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>
             {hasActiveFilters ? '没有符合筛选条件的排练' : '暂无排练安排'}

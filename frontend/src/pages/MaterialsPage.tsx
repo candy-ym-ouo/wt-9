@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -42,6 +43,7 @@ const ALL_ROLES = ['admin', 'director', 'actor', 'viewer'];
 const ROLE_LABELS: Record<string, string> = { admin: '管理员', director: '导演', actor: '演员', viewer: '观察者' };
 
 export default function MaterialsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filterCats, setFilterCats] = useState<string[]>([]);
   const [filterTags, setFilterTags] = useState<string[]>([]);
@@ -88,6 +90,22 @@ export default function MaterialsPage() {
 
   useEffect(() => { loadMeta(); }, []);
   useEffect(() => { load(); }, [filterCats, filterTags, keyword]);
+
+  useEffect(() => {
+    const materialIdParam = searchParams.get('materialId');
+    const qParam = searchParams.get('q');
+    if (qParam && !keyword) {
+      setKeyword(qParam);
+    }
+    if (materialIdParam && materials.length > 0) {
+      const id = Number(materialIdParam);
+      const exists = materials.some((m) => m.id === id);
+      if (exists) {
+        handleViewDetail(id);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, materials]);
 
   const buildUploadParams = () => {
     let finalCategories = uploadCategories;

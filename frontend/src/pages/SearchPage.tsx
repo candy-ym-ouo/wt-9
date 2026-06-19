@@ -172,6 +172,41 @@ export default function SearchPage() {
     return MODULE_OPTIONS.find((m) => m.key === type + 's') || MODULE_OPTIONS.find((m) => m.key === type);
   };
 
+  const navigateToModule = (module: string, id: number, extra?: Record<string, string>) => {
+    const params: Record<string, string> = { ...extra };
+    if (query) params.q = query;
+    const search = new URLSearchParams(params).toString();
+    navigate({ pathname: `/${module}`, search });
+  };
+
+  const jumpBtnStyle = (color: string): React.CSSProperties => ({
+    padding: '4px 10px',
+    background: `${color}15`,
+    border: `1px solid ${color}`,
+    borderRadius: 4,
+    color,
+    fontSize: 11,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  });
+
+  const cardInteractiveStyle = (color: string): React.CSSProperties => ({
+    ...cardStyle,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    border: '1px solid #333',
+  });
+
+  const onCardEnter = (e: React.MouseEvent<HTMLDivElement>, color: string) => {
+    (e.currentTarget as HTMLDivElement).style.borderColor = color;
+    (e.currentTarget as HTMLDivElement).style.background = '#1e2a1e';
+  };
+
+  const onCardLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    (e.currentTarget as HTMLDivElement).style.borderColor = '#333';
+    (e.currentTarget as HTMLDivElement).style.background = '#1a1a1a';
+  };
+
   return (
     <div>
       <h2 style={{ margin: '0 0 24px', color: '#e0e0e0' }}>全站检索</h2>
@@ -510,55 +545,75 @@ export default function SearchPage() {
                 <section style={{ marginBottom: 24 }}>
                   <h3 style={{ color: '#e67e22', fontSize: 15, marginBottom: 12 }}>📅 排练 ({results.rehearsals.length})</h3>
                   {results.rehearsals.map((r: any) => (
-                    <div key={r.id} style={{ ...cardStyle, borderLeft: r.hasConflict ? '4px solid #e74c3c' : undefined }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <strong style={{ color: '#e0e0e0' }}>{r.title}</strong>
-                        {r.hasConflict && (
-                          <span style={{
-                            padding: '2px 8px',
-                            background: 'rgba(231, 76, 60, 0.2)',
-                            border: '1px solid #e74c3c',
-                            color: '#e74c3c',
-                            borderRadius: 10,
-                            fontSize: 11,
-                          }}>
-                            ⚠️ 冲突
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                        {formatDate(r.startTime)}
-                        {r.location && ` · 📍 ${r.location}`}
-                      </div>
-                      {r.description && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{r.description}</div>}
-                      {r.participants && r.participants.length > 0 && (
-                        <div style={{
-                          marginTop: 6,
-                          fontSize: 11,
-                          color: '#3498db',
-                        }}>
-                          ✅ 签到: 出勤{r.presentCount || 0} | 缺席{r.absentCount || 0} | 迟到{r.lateCount || 0} | 未签{r.pendingAttendanceCount || 0}
-                        </div>
-                      )}
-                      {r.hasConflict && (
-                        <div style={{
-                          marginTop: 8,
-                          padding: '8px 10px',
-                          background: 'rgba(231, 76, 60, 0.08)',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          color: '#e74c3c',
-                        }}>
-                          {r.timeConflicts && r.timeConflicts.length > 0 && (
-                            <div>📅 时间冲突：{r.timeConflicts.map((x: any) => x.title).join('、')}</div>
+                    <div
+                      key={r.id}
+                      style={cardInteractiveStyle('#e67e22')}
+                      onMouseEnter={(e) => onCardEnter(e, '#e67e22')}
+                      onMouseLeave={(e) => onCardLeave(e)}
+                      onClick={() => navigateToModule('calendar', r.id, { rehearsalId: String(r.id) })}
+                      title="点击跳转到排练页面查看详情"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <strong style={{ color: '#e0e0e0' }}>{r.title}</strong>
+                            {r.hasConflict && (
+                              <span style={{
+                                padding: '2px 8px',
+                                background: 'rgba(231, 76, 60, 0.2)',
+                                border: '1px solid #e74c3c',
+                                color: '#e74c3c',
+                                borderRadius: 10,
+                                fontSize: 11,
+                              }}>
+                                ⚠️ 冲突
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                            {formatDate(r.startTime)}
+                            {r.location && ` · 📍 ${r.location}`}
+                          </div>
+                          {r.description && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{r.description}</div>}
+                          {r.participants && r.participants.length > 0 && (
+                            <div style={{
+                              marginTop: 6,
+                              fontSize: 11,
+                              color: '#3498db',
+                            }}>
+                              ✅ 签到: 出勤{r.presentCount || 0} | 缺席{r.absentCount || 0} | 迟到{r.lateCount || 0} | 未签{r.pendingAttendanceCount || 0}
+                            </div>
                           )}
-                          {r.participantConflicts && r.participantConflicts.length > 0 && (
-                            <div style={{ marginTop: 4 }}>
-                              👥 参与人占用：{r.participantConflicts.map((p: any) => `${p.userName || '用户#' + p.userId}在${p.conflictingRehearsals.map((x: any) => x.title).join('、')}有安排`).join('；')}
+                          {r.hasConflict && (
+                            <div style={{
+                              marginTop: 8,
+                              padding: '8px 10px',
+                              background: 'rgba(231, 76, 60, 0.08)',
+                              borderRadius: 4,
+                              fontSize: 12,
+                              color: '#e74c3c',
+                            }}>
+                              {r.timeConflicts && r.timeConflicts.length > 0 && (
+                                <div>📅 时间冲突：{r.timeConflicts.map((x: any) => x.title).join('、')}</div>
+                              )}
+                              {r.participantConflicts && r.participantConflicts.length > 0 && (
+                                <div style={{ marginTop: 4 }}>
+                                  👥 参与人占用：{r.participantConflicts.map((p: any) => `${p.userName || '用户#' + p.userId}在${p.conflictingRehearsals.map((x: any) => x.title).join('、')}有安排`).join('；')}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateToModule('calendar', r.id, { rehearsalId: String(r.id) });
+                          }}
+                          style={jumpBtnStyle('#e67e22')}
+                        >
+                          跳转 →
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </section>
@@ -577,58 +632,78 @@ export default function SearchPage() {
                       return { text: '正常', color: '#2ecc71', bg: 'rgba(46,204,113,0.1)' };
                     })();
                     return (
-                      <div key={r.id} style={cardStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <strong style={{ color: '#e0e0e0' }}>{r.characterName}</strong>
-                          <span style={{
-                            padding: '2px 8px',
-                            background: statusInfo.bg,
-                            border: `1px solid ${statusInfo.color}`,
-                            color: statusInfo.color,
-                            borderRadius: 10,
-                            fontSize: 11,
-                          }}>
-                            {statusInfo.text}
-                          </span>
-                        </div>
-                        {r.characterDescription && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{r.characterDescription}</div>}
-                        {r.actorName && (
-                          <div style={{ fontSize: 13, color: '#aaa', marginTop: 6 }}>
-                            扮演者: <strong style={{ color: '#e0e0e0' }}>{r.actorName}</strong>
-                          </div>
-                        )}
-                        {r.substituteActors && r.substituteActors.length > 0 && (
-                          <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
-                            替补: {r.substituteActors.map((s: any) => (
-                              <span key={s.id} style={{
-                                padding: '2px 6px',
-                                background: s.isOnLeave ? 'rgba(231,76,60,0.1)' : 'rgba(46,204,113,0.1)',
-                                border: `1px solid ${s.isOnLeave ? '#e74c3c' : '#2ecc71'}`,
-                                color: s.isOnLeave ? '#e74c3c' : '#2ecc71',
-                                borderRadius: 8,
+                      <div
+                        key={r.id}
+                        style={cardInteractiveStyle('#9b59b6')}
+                        onMouseEnter={(e) => onCardEnter(e, '#9b59b6')}
+                        onMouseLeave={(e) => onCardLeave(e)}
+                        onClick={() => navigateToModule('roles', r.id, { roleId: String(r.id) })}
+                        title="点击跳转到角色页面查看详情"
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <strong style={{ color: '#e0e0e0' }}>{r.characterName}</strong>
+                              <span style={{
+                                padding: '2px 8px',
+                                background: statusInfo.bg,
+                                border: `1px solid ${statusInfo.color}`,
+                                color: statusInfo.color,
+                                borderRadius: 10,
                                 fontSize: 11,
-                                marginRight: 4,
                               }}>
-                                {s.displayName || s.username}{s.isOnLeave ? '(请假)' : ''}
+                                {statusInfo.text}
                               </span>
-                            ))}
+                            </div>
+                            {r.characterDescription && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{r.characterDescription}</div>}
+                            {r.actorName && (
+                              <div style={{ fontSize: 13, color: '#aaa', marginTop: 6 }}>
+                                扮演者: <strong style={{ color: '#e0e0e0' }}>{r.actorName}</strong>
+                              </div>
+                            )}
+                            {r.substituteActors && r.substituteActors.length > 0 && (
+                              <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+                                替补: {r.substituteActors.map((s: any) => (
+                                  <span key={s.id} style={{
+                                    padding: '2px 6px',
+                                    background: s.isOnLeave ? 'rgba(231,76,60,0.1)' : 'rgba(46,204,113,0.1)',
+                                    border: `1px solid ${s.isOnLeave ? '#e74c3c' : '#2ecc71'}`,
+                                    color: s.isOnLeave ? '#e74c3c' : '#2ecc71',
+                                    borderRadius: 8,
+                                    fontSize: 11,
+                                    marginRight: 4,
+                                  }}>
+                                    {s.displayName || s.username}{s.isOnLeave ? '(请假)' : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {r.activeLeave && (
+                              <div style={{
+                                marginTop: 8,
+                                padding: '6px 10px',
+                                background: 'rgba(230,126,34,0.08)',
+                                border: '1px solid rgba(230,126,34,0.3)',
+                                borderRadius: 6,
+                                fontSize: 12,
+                                color: '#e67e22',
+                              }}>
+                                请假中 · {r.activeLeave.type === 'sick' ? '病假' : r.activeLeave.type === 'personal' ? '事假' : '其他'}
+                                {r.activeLeave.reason && ` · ${r.activeLeave.reason}`}
+                                {r.currentSubstitute && ` → 替补: ${r.currentSubstitute.displayName || r.currentSubstitute.username}`}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {r.activeLeave && (
-                          <div style={{
-                            marginTop: 8,
-                            padding: '6px 10px',
-                            background: 'rgba(230,126,34,0.08)',
-                            border: '1px solid rgba(230,126,34,0.3)',
-                            borderRadius: 6,
-                            fontSize: 12,
-                            color: '#e67e22',
-                          }}>
-                            请假中 · {r.activeLeave.type === 'sick' ? '病假' : r.activeLeave.type === 'personal' ? '事假' : '其他'}
-                            {r.activeLeave.reason && ` · ${r.activeLeave.reason}`}
-                            {r.currentSubstitute && ` → 替补: ${r.currentSubstitute.displayName || r.currentSubstitute.username}`}
-                          </div>
-                        )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToModule('roles', r.id, { roleId: String(r.id) });
+                            }}
+                            style={jumpBtnStyle('#9b59b6')}
+                          >
+                            跳转 →
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -641,25 +716,13 @@ export default function SearchPage() {
                   {results.annotations.map((a: any) => (
                     <div
                       key={a.id}
-                      style={{
-                        ...cardStyle,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        border: '1px solid #333',
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLDivElement).style.borderColor = '#2ecc71';
-                        (e.currentTarget as HTMLDivElement).style.background = '#1e2a1e';
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLDivElement).style.borderColor = '#333';
-                        (e.currentTarget as HTMLDivElement).style.background = '#1a1a1a';
-                      }}
+                      style={cardInteractiveStyle('#2ecc71')}
+                      onMouseEnter={(e) => onCardEnter(e, '#2ecc71')}
+                      onMouseLeave={(e) => onCardLeave(e)}
                       onClick={() => {
                         const params: Record<string, string> = { annotationId: String(a.id) };
                         if (a.sceneNumber) params.scene = String(a.sceneNumber);
-                        if (query) params.q = query;
-                        navigate({ pathname: '/annotations', search: new URLSearchParams(params).toString() });
+                        navigateToModule('annotations', a.id, params);
                       }}
                       title="点击跳转到批注页面查看详情"
                     >
@@ -710,19 +773,9 @@ export default function SearchPage() {
                             e.stopPropagation();
                             const params: Record<string, string> = { annotationId: String(a.id) };
                             if (a.sceneNumber) params.scene = String(a.sceneNumber);
-                            if (query) params.q = query;
-                            navigate({ pathname: '/annotations', search: new URLSearchParams(params).toString() });
+                            navigateToModule('annotations', a.id, params);
                           }}
-                          style={{
-                            padding: '4px 10px',
-                            background: 'rgba(46,204,113,0.1)',
-                            border: '1px solid #2ecc71',
-                            borderRadius: 4,
-                            color: '#2ecc71',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
+                          style={jumpBtnStyle('#2ecc71')}
                         >
                           跳转 →
                         </button>
@@ -736,49 +789,69 @@ export default function SearchPage() {
                 <section style={{ marginBottom: 24 }}>
                   <h3 style={{ color: '#3498db', fontSize: 15, marginBottom: 12 }}>📁 素材 ({results.materials.length})</h3>
                   {results.materials.map((m: any) => (
-                    <div key={m.id} style={cardStyle}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <strong style={{ color: '#e0e0e0' }}>{m.originalName}</strong>
-                        {m.referenceCount && m.referenceCount.total > 0 && (
-                          <span style={{
-                            padding: '2px 8px',
-                            background: 'rgba(243, 156, 18, 0.15)',
-                            border: '1px solid #f39c12',
-                            color: '#f39c12',
-                            borderRadius: 10,
-                            fontSize: 11,
-                          }}>
-                            🔗 {m.referenceCount.total} 次引用
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                        {m.category} · {(m.size / 1024).toFixed(1)} KB
-                      </div>
-                      {m.description && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{m.description}</div>}
-                      {m.tags && m.tags.length > 0 && (
-                        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {m.tags.map((t: string, i: number) => (
-                            <span
-                              key={i}
-                              style={{
-                                background: '#2a2a2a',
-                                color: '#888',
-                                padding: '2px 6px',
-                                borderRadius: 6,
+                    <div
+                      key={m.id}
+                      style={cardInteractiveStyle('#3498db')}
+                      onMouseEnter={(e) => onCardEnter(e, '#3498db')}
+                      onMouseLeave={(e) => onCardLeave(e)}
+                      onClick={() => navigateToModule('materials', m.id, { materialId: String(m.id) })}
+                      title="点击跳转到素材页面查看详情"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <strong style={{ color: '#e0e0e0' }}>{m.originalName}</strong>
+                            {m.referenceCount && m.referenceCount.total > 0 && (
+                              <span style={{
+                                padding: '2px 8px',
+                                background: 'rgba(243, 156, 18, 0.15)',
+                                border: '1px solid #f39c12',
+                                color: '#f39c12',
+                                borderRadius: 10,
                                 fontSize: 11,
-                              }}
-                            >
-                              🏷️ {t}
-                            </span>
-                          ))}
+                              }}>
+                                🔗 {m.referenceCount.total} 次引用
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                            {m.category} · {(m.size / 1024).toFixed(1)} KB
+                          </div>
+                          {m.description && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{m.description}</div>}
+                          {m.tags && m.tags.length > 0 && (
+                            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {m.tags.map((t: string, i: number) => (
+                                <span
+                                  key={i}
+                                  style={{
+                                    background: '#2a2a2a',
+                                    color: '#888',
+                                    padding: '2px 6px',
+                                    borderRadius: 6,
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  🏷️ {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {m.referenceCount && m.referenceCount.total > 0 && (
+                            <div style={{ fontSize: 11, color: '#f39c12', marginTop: 6 }}>
+                              📅 {m.referenceCount.rehearsals} 个排练 · 📝 {m.referenceCount.annotations} 个批注
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {m.referenceCount && m.referenceCount.total > 0 && (
-                        <div style={{ fontSize: 11, color: '#f39c12', marginTop: 6 }}>
-                          📅 {m.referenceCount.rehearsals} 个排练 · 📝 {m.referenceCount.annotations} 个批注
-                        </div>
-                      )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateToModule('materials', m.id, { materialId: String(m.id) });
+                          }}
+                          style={jumpBtnStyle('#3498db')}
+                        >
+                          跳转 →
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </section>
@@ -789,13 +862,18 @@ export default function SearchPage() {
               <div>
                 {results.flatResults.map((item: any, index: number) => {
                   const moduleInfo = getModuleInfo(item.type);
-                  const isAnnotation = item.type === 'annotation';
+                  const moduleColor = moduleInfo?.color || '#666';
                   const handleJump = () => {
-                    if (isAnnotation) {
+                    if (item.type === 'rehearsal') {
+                      navigateToModule('calendar', item.id, { rehearsalId: String(item.id) });
+                    } else if (item.type === 'role') {
+                      navigateToModule('roles', item.id, { roleId: String(item.id) });
+                    } else if (item.type === 'annotation') {
                       const params: Record<string, string> = { annotationId: String(item.id) };
                       if (item.raw?.sceneNumber) params.scene = String(item.raw.sceneNumber);
-                      if (query) params.q = query;
-                      navigate({ pathname: '/annotations', search: new URLSearchParams(params).toString() });
+                      navigateToModule('annotations', item.id, params);
+                    } else if (item.type === 'material') {
+                      navigateToModule('materials', item.id, { materialId: String(item.id) });
                     }
                   };
                   return (
@@ -803,49 +881,41 @@ export default function SearchPage() {
                       key={`${item.type}-${item.id}`}
                       style={{
                         ...cardStyle,
-                        borderLeft: `4px solid ${moduleInfo?.color || '#666'}`,
-                        cursor: isAnnotation ? 'pointer' : 'default',
+                        borderLeft: `4px solid ${moduleColor}`,
+                        cursor: 'pointer',
                         transition: 'all 0.2s',
                       }}
-                      onClick={isAnnotation ? handleJump : undefined}
-                      onMouseEnter={isAnnotation ? (e) => {
+                      onClick={handleJump}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.borderColor = moduleColor;
                         (e.currentTarget as HTMLDivElement).style.background = '#1e2a1e';
-                      } : undefined}
-                      onMouseLeave={isAnnotation ? (e) => {
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.borderColor = '#333';
                         (e.currentTarget as HTMLDivElement).style.background = '#1a1a1a';
-                      } : undefined}
-                      title={isAnnotation ? '点击跳转到批注页面查看详情' : undefined}
+                      }}
+                      title={`点击跳转到${moduleInfo?.label || item.type}页面查看详情`}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <span style={{ fontSize: 16 }}>{moduleInfo?.icon || '📄'}</span>
                         <strong style={{ color: '#e0e0e0' }}>{item.title}</strong>
                         <span style={{
                           padding: '2px 8px',
-                          background: moduleInfo?.color + '20',
-                          border: `1px solid ${moduleInfo?.color}`,
-                          color: moduleInfo?.color,
+                          background: moduleColor + '20',
+                          border: `1px solid ${moduleColor}`,
+                          color: moduleColor,
                           borderRadius: 10,
                           fontSize: 11,
                           marginLeft: 'auto',
                         }}>
                           {moduleInfo?.label || item.type}
                         </span>
-                        {isAnnotation && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleJump(); }}
-                            style={{
-                              padding: '3px 10px',
-                              background: 'rgba(46,204,113,0.1)',
-                              border: '1px solid #2ecc71',
-                              borderRadius: 4,
-                              color: '#2ecc71',
-                              fontSize: 11,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            跳转 →
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleJump(); }}
+                          style={jumpBtnStyle(moduleColor)}
+                        >
+                          跳转 →
+                        </button>
                       </div>
                       {item.description && (
                         <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>
@@ -854,7 +924,7 @@ export default function SearchPage() {
                             : item.description}
                         </div>
                       )}
-                      {isAnnotation && item.raw?.sceneNumber && (
+                      {item.type === 'annotation' && item.raw?.sceneNumber && (
                         <div style={{ marginTop: 6 }}>
                           <span
                             style={{

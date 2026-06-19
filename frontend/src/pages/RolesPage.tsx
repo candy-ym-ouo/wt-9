@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -24,6 +25,10 @@ interface CastRole {
 }
 
 export default function RolesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roleRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [highlightedRoleId, setHighlightedRoleId] = useState<number | null>(null);
+
   const [roles, setRoles] = useState<CastRole[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -46,6 +51,25 @@ export default function RolesPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const roleIdParam = searchParams.get('roleId');
+    if (roleIdParam && roles.length > 0) {
+      const id = Number(roleIdParam);
+      const exists = roles.some((r) => r.id === id);
+      if (exists) {
+        setHighlightedRoleId(id);
+        setTimeout(() => {
+          const el = roleRefs.current[id];
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+        setTimeout(() => setHighlightedRoleId(null), 3000);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, roles]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,9 +258,11 @@ export default function RolesPage() {
           const availableActors = getAvailableActorsForSubstitute(r);
           const isDragging = draggedId === r.id;
           const isDragOver = dragOverId === r.id;
+          const isHighlighted = highlightedRoleId === r.id;
           return (
             <div
               key={r.id}
+              ref={(el) => { roleRefs.current[r.id] = el; }}
               draggable={sortMode}
               onDragStart={(e) => sortMode && handleDragStart(e, r.id)}
               onDragOver={(e) => sortMode && handleDragOver(e, r.id)}
@@ -250,6 +276,8 @@ export default function RolesPage() {
                 cursor: sortMode ? 'move' : 'default',
                 transform: isDragging ? 'rotate(2deg)' : 'none',
                 transition: 'transform 0.2s, opacity 0.2s',
+                ...(isHighlighted ? { borderColor: '#f39c12', boxShadow: '0 0 12px rgba(243,156,18,0.4)' } : {}),
+                scrollMarginTop: 80,
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
