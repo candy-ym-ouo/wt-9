@@ -11,10 +11,17 @@ export class RehearsalsController {
   constructor(private service: RehearsalsService) {}
 
   @Get()
-  async findAll(@Query('start') start?: string, @Query('end') end?: string) {
+  async findAll(
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+    @Query('location') location?: string,
+    @Query('participantId') participantId?: string,
+    @Query('timeSlot') timeSlot?: string,
+  ) {
+    const hasFilters = location || participantId || timeSlot;
     let rehearsals: Rehearsal[];
-    if (start && end) {
-      rehearsals = await this.service.findByDateRange(start, end);
+    if (hasFilters || (start && end)) {
+      rehearsals = await this.service.findWithFilters({ start, end, location, participantId, timeSlot });
     } else {
       rehearsals = await this.service.findAll();
     }

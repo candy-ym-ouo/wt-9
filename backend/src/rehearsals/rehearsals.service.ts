@@ -123,6 +123,54 @@ export class RehearsalsService {
     );
   }
 
+  async findWithFilters(filters: {
+    start?: string;
+    end?: string;
+    location?: string;
+    participantId?: string;
+    timeSlot?: string;
+  }) {
+    let result = await this.repo.find({ order: { startTime: 'ASC' } });
+
+    if (filters.start && filters.end) {
+      const startDate = new Date(filters.start);
+      const endDate = new Date(filters.end);
+      result = result.filter((r) =>
+        this.isTimeOverlap(startDate, endDate, r.startTime, r.endTime),
+      );
+    }
+
+    if (filters.location) {
+      result = result.filter((r) =>
+        r.location?.toLowerCase().includes(filters.location!.toLowerCase()),
+      );
+    }
+
+    if (filters.participantId) {
+      const pid = parseInt(filters.participantId, 10);
+      if (!isNaN(pid)) {
+        result = result.filter((r) => r.participantIds?.includes(pid));
+      }
+    }
+
+    if (filters.timeSlot) {
+      const [startHour, startMin, endHour, endMin] = filters.timeSlot
+        .split('-')
+        .flatMap((s) => s.split(':').map(Number));
+      if (![startHour, startMin, endHour, endMin].some(isNaN)) {
+        result = result.filter((r) => {
+          const rStart = r.startTime.getHours() * 60 + r.startTime.getMinutes();
+          const rEnd = r.endTime.getHours() * 60 + r.endTime.getMinutes();
+          const fStart = startHour * 60 + startMin;
+          const fEnd = endHour * 60 + endMin;
+          return rStart < fEnd && rEnd > fStart;
+        });
+      }
+    }
+
+    return result;
+  }
+
   async findOne(id: number) {
     return this.repo.findOne({ where: { id } });
   }

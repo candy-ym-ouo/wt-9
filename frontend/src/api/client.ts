@@ -63,11 +63,20 @@ export const api = {
     remove: (id: number) => request<any>(`/users/${id}`, { method: 'DELETE' }),
   },
   rehearsals: {
-    list: (start?: string, end?: string) => {
-      const params = new URLSearchParams();
-      if (start) params.set('start', start);
-      if (end) params.set('end', end);
-      const q = params.toString();
+    list: (params?: {
+      start?: string;
+      end?: string;
+      location?: string;
+      participantId?: number;
+      timeSlot?: string;
+    }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.start) searchParams.set('start', params.start);
+      if (params?.end) searchParams.set('end', params.end);
+      if (params?.location) searchParams.set('location', params.location);
+      if (params?.participantId) searchParams.set('participantId', String(params.participantId));
+      if (params?.timeSlot) searchParams.set('timeSlot', params.timeSlot);
+      const q = searchParams.toString();
       return request<any[]>(`/rehearsals${q ? '?' + q : ''}`);
     },
     get: (id: number) => request<any>(`/rehearsals/${id}`),

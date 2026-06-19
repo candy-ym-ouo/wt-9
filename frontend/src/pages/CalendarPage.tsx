@@ -65,6 +65,20 @@ function formatLocalInput(d: string | Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+interface Filters {
+  location: string;
+  participantId: number | null;
+  timeSlotStart: string;
+  timeSlotEnd: string;
+}
+
+const emptyFilters: Filters = {
+  location: '',
+  participantId: null,
+  timeSlotStart: '',
+  timeSlotEnd: '',
+};
+
 export default function CalendarPage() {
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -74,11 +88,26 @@ export default function CalendarPage() {
   const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
   const [checkingConflict, setCheckingConflict] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [showFilters, setShowFilters] = useState(false);
   const { user, isDirector, isAdmin } = useAuth();
 
   const load = async () => {
-    const data = await api.rehearsals.list();
+    const params: Parameters<typeof api.rehearsals.list>[0] = {};
+    if (filters.location) params.location = filters.location;
+    if (filters.participantId) params.participantId = filters.participantId;
+    if (filters.timeSlotStart && filters.timeSlotEnd) {
+      params.timeSlot = `${filters.timeSlotStart}-${filters.timeSlotEnd}`;
+    }
+    const data = await api.rehearsals.list(params);
     setRehearsals(data);
+  };
+
+  const hasActiveFilters =
+    filters.location || filters.participantId || (filters.timeSlotStart && filters.timeSlotEnd);
+
+  const resetFilters = () => {
+    setFilters(emptyFilters);
   };
 
   const loadUsers = async () => {
@@ -96,6 +125,10 @@ export default function CalendarPage() {
       loadUsers();
     }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [filters]);
 
   useEffect(() => {
     if (!showForm || !form.startTime || !form.endTime) {
@@ -209,23 +242,118 @@ export default function CalendarPage() {
             </span>
           )}
         </div>
-        {canEdit && (
+        <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => showForm ? resetForm() : setShowForm(true)}
+            onClick={() => setShowFilters(!showFilters)}
             style={{
               padding: '8px 16px',
-              background: '#e74c3c',
-              border: 'none',
+              background: showFilters ? 'rgba(52, 152, 219, 0.2)' : 'transparent',
+              border: '1px solid #3498db',
               borderRadius: 6,
-              color: '#fff',
+              color: '#3498db',
               cursor: 'pointer',
               fontSize: 14,
             }}
           >
-            {showForm ? '取消' : '+ 新排练'}
+            🔍 筛选 {hasActiveFilters && <span style={{ marginLeft: 6, color: '#e74c3c' }}>●</span>}
           </button>
-        )}
+          {canEdit && (
+            <button
+              onClick={() => showForm ? resetForm() : setShowForm(true)}
+              style={{
+                padding: '8px 16px',
+                background: '#e74c3c',
+                border: 'none',
+                borderRadius: 6,
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 14,
+              }}
+            >
+              {showForm ? '取消' : '+ 新排练'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {showFilters && (
+        <div style={{
+          background: '#1a1a1a',
+          padding: 16,
+          borderRadius: 8,
+          border: '1px solid #333',
+          marginBottom: 24,
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, alignItems: 'end' }}>
+            <div>
+              <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>📍 地点</div>
+              <input
+                placeholder="输入地点关键词"
+                value={filters.location}
+                onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>👤 演员</div>
+              <select
+                value={filters.participantId ?? ''}
+                onChange={(e) => setFilters({ ...filters, participantId: e.target.value ? Number(e.target.value) : null })}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                <option value="">全部演员</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.displayName || u.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>⏰ 时间段开始</div>
+              <input
+                type="time"
+                value={filters.timeSlotStart}
+                onChange={(e) => setFilters({ ...filters, timeSlotStart: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>⏰ 时间段结束</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="time"
+                  value={filters.timeSlotEnd}
+                  onChange={(e) => setFilters({ ...filters, timeSlotEnd: e.target.value })}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'transparent',
+                      border: '1px solid #666',
+                      borderRadius: 6,
+                      color: '#888',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                    }}
+                  >
+                    重置
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          {hasActiveFilters && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #333', color: '#666', fontSize: 13 }}>
+              当前筛选结果：<span style={{ color: '#3498db' }}>{rehearsals.length}</span> 条排练
+            </div>
+          )}
+        </div>
+      )}
 
       {showForm && canEdit && (
         <form onSubmit={handleSubmit} style={{
@@ -414,7 +542,9 @@ export default function CalendarPage() {
           </div>
         ))}
         {rehearsals.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>暂无排练安排</div>
+          <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>
+            {hasActiveFilters ? '没有符合筛选条件的排练' : '暂无排练安排'}
+          </div>
         )}
       </div>
     </div>
