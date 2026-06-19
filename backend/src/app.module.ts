@@ -12,6 +12,7 @@ import { SearchModule } from './search/search.module';
 import { LeavesModule } from './leaves/leaves.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     LeavesModule,
     RemindersModule,
     AuditLogsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

@@ -23,6 +23,11 @@ export class AnnotationsController {
     return this.service.findGroupedByScene(search);
   }
 
+  @Get('meta/tags')
+  getTags() {
+    return this.service.getAllTags();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: number) {
     return this.service.findOne(id);
@@ -56,6 +61,7 @@ export class AnnotationsController {
       startOffset?: number;
       endOffset?: number;
       tag?: string;
+      tagColor?: string;
       sceneNumber?: number;
       materialIds?: number[];
     },

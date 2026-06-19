@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 interface User {
@@ -44,12 +45,14 @@ const ROLES = [
 const ROLE_LABELS: Record<string, string> = { admin: '管理员', director: '导演', actor: '演员', viewer: '观察者' };
 
 export default function AdminPage() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', role: 'actor', displayName: '' });
   const [leaveStats, setLeaveStats] = useState<any>(null);
   const [attendanceStats, setAttendanceStats] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [overview, setOverview] = useState<any>(null);
 
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -58,16 +61,18 @@ export default function AdminPage() {
   });
 
   const load = async () => {
-    const [usersData, statsData, attendanceData, logsData] = await Promise.all([
+    const [usersData, statsData, attendanceData, logsData, overviewData] = await Promise.all([
       api.users.list(),
       api.leaves.statistics(),
       api.rehearsals.getStatistics(),
       api.auditLogs.list({ limit: 50 }),
+      api.dashboard.overview(),
     ]);
     setUsers(usersData);
     setLeaveStats(statsData);
     setAttendanceStats(attendanceData);
     setAuditLogs(logsData.enriched || logsData.items || logsData);
+    setOverview(overviewData);
   };
 
   const loadMaterials = async () => {
@@ -148,6 +153,93 @@ export default function AdminPage() {
 
   return (
     <div>
+      {overview && (
+        <div style={{ marginBottom: 32 }}>
+          <h2 style={{ margin: '0 0 16px', color: '#e0e0e0', fontSize: 20 }}>📊 数据概览</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <div
+              onClick={() => navigate('/admin')}
+              style={{ ...overviewCardStyle, borderLeftColor: '#3498db', cursor: 'pointer' }}
+            >
+              <div style={overviewCardHeader}>
+                <span style={{ fontSize: 24 }}>👥</span>
+                <span style={overviewCardLink}>查看 →</span>
+              </div>
+              <div style={overviewCardNumber}>{overview.users.total}</div>
+              <div style={overviewCardLabel}>用户总数</div>
+              <div style={overviewCardSubStats}>
+                <span style={{ color: '#2ecc71' }}>● 活跃 {overview.users.active}</span>
+                <span style={{ color: '#e74c3c' }}>● 冻结 {overview.users.frozen}</span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => navigate('/calendar')}
+              style={{ ...overviewCardStyle, borderLeftColor: '#e74c3c', cursor: 'pointer' }}
+            >
+              <div style={overviewCardHeader}>
+                <span style={{ fontSize: 24 }}>📅</span>
+                <span style={overviewCardLink}>查看 →</span>
+              </div>
+              <div style={overviewCardNumber}>{overview.rehearsals.total}</div>
+              <div style={overviewCardLabel}>排练总数</div>
+              <div style={overviewCardSubStats}>
+                <span style={{ color: '#f39c12' }}>● 本周 {overview.rehearsals.thisWeek}</span>
+                <span style={{ color: '#2ecc71' }}>● 即将开始 {overview.rehearsals.upcoming}</span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => navigate('/roles')}
+              style={{ ...overviewCardStyle, borderLeftColor: '#9b59b6', cursor: 'pointer' }}
+            >
+              <div style={overviewCardHeader}>
+                <span style={{ fontSize: 24 }}>🎭</span>
+                <span style={overviewCardLink}>查看 →</span>
+              </div>
+              <div style={overviewCardNumber}>{overview.roles.total}</div>
+              <div style={overviewCardLabel}>角色总数</div>
+              <div style={overviewCardSubStats}>
+                <span style={{ color: '#2ecc71' }}>● 已分配 {overview.roles.withActor}</span>
+                <span style={{ color: '#95a5a6' }}>● 有替补 {overview.roles.withSubstitutes}</span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => navigate('/materials')}
+              style={{ ...overviewCardStyle, borderLeftColor: '#f39c12', cursor: 'pointer' }}
+            >
+              <div style={overviewCardHeader}>
+                <span style={{ fontSize: 24 }}>📁</span>
+                <span style={overviewCardLink}>查看 →</span>
+              </div>
+              <div style={overviewCardNumber}>{overview.materials.total}</div>
+              <div style={overviewCardLabel}>素材总数</div>
+              <div style={overviewCardSubStats}>
+                <span style={{ color: '#3498db' }}>
+                  总大小 {formatSize(overview.materials.totalSize)}
+                </span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => navigate('/annotations')}
+              style={{ ...overviewCardStyle, borderLeftColor: '#1abc9c', cursor: 'pointer' }}
+            >
+              <div style={overviewCardHeader}>
+                <span style={{ fontSize: 24 }}>📝</span>
+                <span style={overviewCardLink}>查看 →</span>
+              </div>
+              <div style={overviewCardNumber}>{overview.annotations.total}</div>
+              <div style={overviewCardLabel}>批注总数</div>
+              <div style={overviewCardSubStats}>
+                <span style={{ color: '#e67e22' }}>● {overview.annotations.scenes} 个场次</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h2 style={{ margin: 0, color: '#e0e0e0' }}>权限管理</h2>
         <button onClick={() => setShowForm(!showForm)} style={primaryBtnStyle}>
@@ -664,4 +756,47 @@ const actionChipStyle: React.CSSProperties = {
   borderRadius: 4,
   color: '#fff',
   fontSize: 11,
+};
+
+const overviewCardStyle: React.CSSProperties = {
+  background: '#1a1a1a',
+  borderRadius: 8,
+  border: '1px solid #333',
+  borderLeft: '4px solid',
+  padding: 16,
+  transition: 'all 0.2s ease',
+};
+
+const overviewCardHeader: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 12,
+};
+
+const overviewCardLink: React.CSSProperties = {
+  fontSize: 12,
+  color: '#666',
+  transition: 'color 0.2s',
+};
+
+const overviewCardNumber: React.CSSProperties = {
+  fontSize: 32,
+  fontWeight: 700,
+  color: '#e0e0e0',
+  lineHeight: 1,
+  marginBottom: 8,
+};
+
+const overviewCardLabel: React.CSSProperties = {
+  fontSize: 14,
+  color: '#888',
+  marginBottom: 12,
+};
+
+const overviewCardSubStats: React.CSSProperties = {
+  display: 'flex',
+  gap: 12,
+  fontSize: 12,
+  color: '#666',
 };

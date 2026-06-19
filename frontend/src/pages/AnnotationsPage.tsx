@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+
+interface TagInfo {
+  name: string;
+  color: string | null;
+}
 
 interface Annotation {
   id: number;
@@ -10,6 +15,7 @@ interface Annotation {
   startOffset: number | null;
   endOffset: number | null;
   tag: string;
+  tagColor: string;
   sceneNumber: number | null;
   createdBy: number;
   createdAt: string;
@@ -46,6 +52,7 @@ interface AnnotationVersion {
   startOffset: number | null;
   endOffset: number | null;
   tag: string;
+  tagColor: string;
   sceneNumber: number | null;
   createdBy: number;
   action: string;
@@ -67,29 +74,69 @@ const actionColors: Record<string, string> = {
   restore: '#9b59b6',
 };
 
-const tagColors: Record<string, string> = {
-  '舞台指示': '#3498db',
-  '情感': '#e74c3c',
-  '节奏': '#e67e22',
-  '走位': '#2ecc71',
-  '道具': '#9b59b6',
-  '灯光': '#f1c40f',
-};
+const DEFAULT_TAG_COLORS = [
+  '#3498db', '#e74c3c', '#e67e22', '#2ecc71', '#9b59b6',
+  '#f1c40f', '#1abc9c', '#e91e63', '#00bcd4', '#ff5722',
+  '#8bc34a', '#607d8b',
+];
+
+const PRESET_TAGS: TagInfo[] = [
+  { name: '舞台指示', color: '#3498db' },
+  { name: '情感', color: '#e74c3c' },
+  { name: '节奏', color: '#e67e22' },
+  { name: '走位', color: '#2ecc71' },
+  { name: '道具', color: '#9b59b6' },
+  { name: '灯光', color: '#f1c40f' },
+];
+
+const FILTER_STATE_KEY = 'annotations_filter_state';
+
+interface FilterState {
+  searchQuery: string;
+  selectedTags: string[];
+  activeScene: number | null | '__all__';
+  viewMode: 'grouped' | 'list';
+}
+
+function loadFilterState(): FilterState | null {
+  try {
+    const raw = localStorage.getItem(FILTER_STATE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveFilterState(state: FilterState) {
+  try {
+    localStorage.setItem(FILTER_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
 
 export default function AnnotationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
+  const saved = useMemo(() => loadFilterState(), []);
+
   const [groupedData, setGroupedData] = useState<GroupedResult | null>(null);
   const [materials, setMaterials] = useState<MaterialLite[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeScene, setActiveScene] = useState<number | null | '__all__'>('__all__');
+  const [availableTags, setAvailableTags] = useState<TagInfo[]>([]);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || saved?.searchQuery || '');
+  const [selectedTags, setSelectedTags] = useState<string[]>(
+    searchParams.get('tags') ? searchParams.get('tags')!.split(',') : saved?.selectedTags || []
+  );
+  const [activeScene, setActiveScene] = useState<number | null | '__all__'>(
+    searchParams.get('scene')
+      ? searchParams.get('scene') === 'all' ? '__all__' : Number(searchParams.get('scene'))
+      : saved?.activeScene ?? '__all__'
+  );
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({
     scriptContent: '',
     note: '',
     tag: '',
+    tagColor: '',
     sceneNumber: '',
     startOffset: '',
     endOffset: '',
@@ -97,11 +144,16 @@ export default function AnnotationsPage() {
   });
   const [versions, setVersions] = useState<Record<number, AnnotationVersion[]>>({});
   const [showVersions, setShowVersions] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped');
+  const [viewMode, setViewMode] = useState<'grouped' | 'list'>(
+    searchParams.get('viewMode') as 'grouped' | 'list' || saved?.viewMode || 'grouped'
+  );
   const [highlightedAnnotationId, setHighlightedAnnotationId] = useState<number | null>(null);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [customTagInput, setCustomTagInput] = useState('');
 
   const annotationRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const sceneRefs = useRef<Record<string, HTMLElement | null>>({});
+  const colorInputRef = useRef<HTMLInputElement>(null);
 
   const { user, isDirector } = useAuth();
 
@@ -109,6 +161,19 @@ export default function AnnotationsPage() {
     if (isDirector) return true;
     return user?.id === annotation.createdBy;
   };
+
+  const getTagColor = useCallback((tag: string, tagColor?: string | null): string => {
+    if (tagColor) return tagColor;
+    const preset = PRESET_TAGS.find((t) => t.name === tag);
+    if (preset?.color) return preset.color;
+    const fromAvailable = availableTags.find((t) => t.name === tag);
+    if (fromAvailable?.color) return fromAvailable.color;
+    let hash = 0;
+    for (let i = 0; i < tag.length; i++) {
+      hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return DEFAULT_TAG_COLORS[Math.abs(hash) % DEFAULT_TAG_COLORS.length];
+  }, [availableTags]);
 
   const loadGrouped = async (query?: string) => {
     try {
@@ -128,9 +193,19 @@ export default function AnnotationsPage() {
     }
   };
 
+  const loadTags = async () => {
+    try {
+      const data = await api.annotations.getTags();
+      setAvailableTags(data);
+    } catch (e) {
+      console.error('加载标签列表失败', e);
+    }
+  };
+
   useEffect(() => {
     loadGrouped();
     loadMaterials();
+    loadTags();
   }, []);
 
   useEffect(() => {
@@ -140,6 +215,10 @@ export default function AnnotationsPage() {
     }, 300);
     return () => clearTimeout(handler);
   }, [searchQuery]);
+
+  useEffect(() => {
+    saveFilterState({ searchQuery, selectedTags, activeScene, viewMode });
+  }, [searchQuery, selectedTags, activeScene, viewMode]);
 
   const syncUrlParams = () => {
     const params = new URLSearchParams(searchParams);
@@ -153,8 +232,22 @@ export default function AnnotationsPage() {
     } else {
       params.delete('scene');
     }
+    if (selectedTags.length > 0) {
+      params.set('tags', selectedTags.join(','));
+    } else {
+      params.delete('tags');
+    }
+    if (viewMode !== 'grouped') {
+      params.set('viewMode', viewMode);
+    } else {
+      params.delete('viewMode');
+    }
     setSearchParams(params, { replace: true });
   };
+
+  useEffect(() => {
+    syncUrlParams();
+  }, [selectedTags, activeScene, viewMode]);
 
   useEffect(() => {
     const sceneParam = searchParams.get('scene');
@@ -241,14 +334,17 @@ export default function AnnotationsPage() {
       scriptContent: form.scriptContent,
       note: form.note || undefined,
       tag: form.tag || undefined,
+      tagColor: form.tag ? (form.tagColor || undefined) : undefined,
       sceneNumber: form.sceneNumber ? Number(form.sceneNumber) : undefined,
       startOffset: form.startOffset ? Number(form.startOffset) : undefined,
       endOffset: form.endOffset ? Number(form.endOffset) : undefined,
       materialIds: form.materialIds.length > 0 ? form.materialIds : undefined,
     });
-    setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
+    setForm({ scriptContent: '', note: '', tag: '', tagColor: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
+    setCustomTagInput('');
     setShowForm(false);
     loadGrouped(searchQuery || undefined);
+    loadTags();
   };
 
   const handleEdit = (annotation: Annotation) => {
@@ -257,11 +353,13 @@ export default function AnnotationsPage() {
       scriptContent: annotation.scriptContent,
       note: annotation.note || '',
       tag: annotation.tag || '',
+      tagColor: annotation.tagColor || '',
       sceneNumber: annotation.sceneNumber?.toString() || '',
       startOffset: annotation.startOffset?.toString() || '',
       endOffset: annotation.endOffset?.toString() || '',
       materialIds: annotation.materialIds || [],
     });
+    setCustomTagInput('');
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -272,14 +370,17 @@ export default function AnnotationsPage() {
         scriptContent: form.scriptContent,
         note: form.note || undefined,
         tag: form.tag || undefined,
+        tagColor: form.tag ? (form.tagColor || undefined) : undefined,
         sceneNumber: form.sceneNumber ? Number(form.sceneNumber) : undefined,
         startOffset: form.startOffset ? Number(form.startOffset) : undefined,
         endOffset: form.endOffset ? Number(form.endOffset) : undefined,
         materialIds: form.materialIds,
       });
       setEditingId(null);
-      setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
+      setForm({ scriptContent: '', note: '', tag: '', tagColor: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
+      setCustomTagInput('');
       loadGrouped(searchQuery || undefined);
+      loadTags();
     } catch (err: any) {
       alert(err.message || '更新失败');
     }
@@ -287,7 +388,8 @@ export default function AnnotationsPage() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
+    setForm({ scriptContent: '', note: '', tag: '', tagColor: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
+    setCustomTagInput('');
   };
 
   const handleDelete = async (id: number) => {
@@ -295,6 +397,7 @@ export default function AnnotationsPage() {
     try {
       await api.annotations.remove(id);
       loadGrouped(searchQuery || undefined);
+      loadTags();
     } catch (err: any) {
       alert(err.message || '删除失败');
     }
@@ -325,9 +428,40 @@ export default function AnnotationsPage() {
     }));
   };
 
+  const selectPresetTag = (tagInfo: TagInfo) => {
+    setForm((prev) => ({
+      ...prev,
+      tag: tagInfo.name,
+      tagColor: tagInfo.color || prev.tagColor,
+    }));
+    setCustomTagInput('');
+  };
+
+  const handleCustomTagConfirm = () => {
+    if (customTagInput.trim()) {
+      const existing = availableTags.find((t) => t.name === customTagInput.trim());
+      setForm((prev) => ({
+        ...prev,
+        tag: customTagInput.trim(),
+        tagColor: existing?.color || prev.tagColor || DEFAULT_TAG_COLORS[availableTags.length % DEFAULT_TAG_COLORS.length],
+      }));
+    }
+  };
+
+  const toggleFilterTag = (tagName: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagName) ? prev.filter((t) => t !== tagName) : [...prev, tagName]
+    );
+  };
+
+  const clearFilterTags = () => {
+    setSelectedTags([]);
+  };
+
   const goToSearchPage = () => {
     const params: Record<string, string> = { modules: 'annotations' };
     if (searchQuery) params.q = searchQuery;
+    if (selectedTags.length > 0) params.tags = selectedTags.join(',');
     navigate({ pathname: '/search', search: new URLSearchParams(params).toString() });
   };
 
@@ -365,14 +499,140 @@ export default function AnnotationsPage() {
     return <>{parts}</>;
   };
 
+  const renderTagSelector = () => {
+    const allTagOptions = [...PRESET_TAGS];
+    availableTags.forEach((t) => {
+      if (!allTagOptions.find((p) => p.name === t.name)) {
+        allTagOptions.push(t);
+      }
+    });
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ color: '#888', fontSize: 13 }}>🏷️ 标签</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {allTagOptions.map((tagInfo) => {
+            const isSelected = form.tag === tagInfo.name;
+            const color = tagInfo.color || getTagColor(tagInfo.name);
+            return (
+              <button
+                key={tagInfo.name}
+                type="button"
+                onClick={() => selectPresetTag(tagInfo)}
+                style={{
+                  padding: '3px 10px',
+                  background: isSelected ? color : `${color}20`,
+                  border: `1px solid ${isSelected ? color : `${color}60`}`,
+                  borderRadius: 12,
+                  color: isSelected ? '#fff' : color,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {tagInfo.name}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input
+            placeholder="自定义标签..."
+            value={customTagInput}
+            onChange={(e) => setCustomTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleCustomTagConfirm();
+              }
+            }}
+            style={{ ...inputStyle, flex: 1, fontSize: 13 }}
+          />
+          <button
+            type="button"
+            onClick={handleCustomTagConfirm}
+            disabled={!customTagInput.trim()}
+            style={{
+              padding: '6px 12px',
+              background: customTagInput.trim() ? '#e74c3c' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              color: customTagInput.trim() ? '#fff' : '#666',
+              cursor: customTagInput.trim() ? 'pointer' : 'default',
+              fontSize: 12,
+            }}
+          >
+            确定
+          </button>
+        </div>
+        {form.tag && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: '#aaa' }}>
+              当前标签:
+            </span>
+            <span
+              style={{
+                background: form.tagColor || getTagColor(form.tag),
+                color: '#fff',
+                padding: '2px 10px',
+                borderRadius: 10,
+                fontSize: 12,
+              }}
+            >
+              {form.tag}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 11, color: '#666' }}>颜色:</span>
+              <div
+                onClick={() => colorInputRef.current?.click()}
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 4,
+                  background: form.tagColor || getTagColor(form.tag),
+                  border: '2px solid #555',
+                  cursor: 'pointer',
+                }}
+              />
+              <input
+                ref={colorInputRef}
+                type="color"
+                value={form.tagColor || getTagColor(form.tag)}
+                onChange={(e) => setForm((prev) => ({ ...prev, tagColor: e.target.value }))}
+                style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, tag: '', tagColor: '' }))}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#888',
+                cursor: 'pointer',
+                fontSize: 16,
+                lineHeight: 1,
+                padding: '0 4px',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderAnnotationCard = (a: Annotation) => {
     const isHighlighted = highlightedAnnotationId === a.id;
+    const displayColor = getTagColor(a.tag, a.tagColor);
     return (
       <div
         key={a.id}
         ref={(el) => { annotationRefs.current[a.id] = el; }}
         style={{
           ...cardStyle,
+          ...(a.tag ? { borderLeft: `3px solid ${displayColor}` } : {}),
           ...(isHighlighted ? { borderColor: '#f39c12', boxShadow: '0 0 12px rgba(243,156,18,0.4)' } : {}),
           transition: 'all 0.3s ease',
         }}
@@ -393,13 +653,8 @@ export default function AnnotationsPage() {
               onChange={(e) => setForm({ ...form, note: e.target.value })}
               style={{ ...inputStyle, minHeight: 60 }}
             />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <input
-                placeholder="标签"
-                value={form.tag}
-                onChange={(e) => setForm({ ...form, tag: e.target.value })}
-                style={inputStyle}
-              />
+            {renderTagSelector()}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <input
                 placeholder="场次"
                 type="number"
@@ -500,7 +755,7 @@ export default function AnnotationsPage() {
                   {a.tag && (
                     <span
                       style={{
-                        background: tagColors[a.tag] || '#555',
+                        background: displayColor,
                         color: '#fff',
                         padding: '2px 8px',
                         borderRadius: 10,
@@ -614,6 +869,19 @@ export default function AnnotationsPage() {
                           <span style={{ fontSize: 12, color: '#888' }}>
                             #{v.id} · {new Date(v.createdAt).toLocaleString('zh-CN')}
                           </span>
+                          {v.tag && (
+                            <span
+                              style={{
+                                background: getTagColor(v.tag, v.tagColor),
+                                color: '#fff',
+                                padding: '1px 6px',
+                                borderRadius: 8,
+                                fontSize: 10,
+                              }}
+                            >
+                              {v.tag}
+                            </span>
+                          )}
                         </div>
                         {canModify(a) && v.action !== 'delete' && (
                           <button
@@ -659,9 +927,35 @@ export default function AnnotationsPage() {
       : groupedData.groups.filter((g) => g.sceneNumber === activeScene)
     : [];
 
-  const allAnnotationsFlat = groupedData
-    ? groupedData.groups.flatMap((g) => g.annotations)
-    : [];
+  const allAnnotationsFlat = useMemo(() => {
+    if (!groupedData) return [];
+    const all = groupedData.groups.flatMap((g) => g.annotations);
+    if (selectedTags.length === 0) return all;
+    return all.filter((a) => a.tag && selectedTags.includes(a.tag));
+  }, [groupedData, selectedTags]);
+
+  const filteredVisibleGroups = useMemo(() => {
+    if (selectedTags.length === 0) return visibleGroups;
+    return visibleGroups.map((g) => ({
+      ...g,
+      annotations: g.annotations.filter((a) => a.tag && selectedTags.includes(a.tag)),
+      count: g.annotations.filter((a) => a.tag && selectedTags.includes(a.tag)).length,
+    })).filter((g) => g.count > 0);
+  }, [visibleGroups, selectedTags]);
+
+  const tagsInUse = useMemo(() => {
+    if (!groupedData) return [] as TagInfo[];
+    const tagSet = new Map<string, string | null>();
+    groupedData.groups.flatMap((g) => g.annotations).forEach((a) => {
+      if (a.tag && !tagSet.has(a.tag)) {
+        tagSet.set(a.tag, a.tagColor || null);
+      }
+    });
+    return Array.from(tagSet.entries()).map(([name, color]) => ({
+      name,
+      color: color || getTagColor(name),
+    }));
+  }, [groupedData, getTagColor]);
 
   return (
     <div>
@@ -671,10 +965,11 @@ export default function AnnotationsPage() {
           {groupedData && (
             <span style={{ fontSize: 12, color: '#888' }}>
               共 {groupedData.totalCount} 条批注 · {groupedData.sceneCount} 个场次
+              {selectedTags.length > 0 && ` · 筛选 ${allAnnotationsFlat.length} 条`}
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 4, background: '#1a1a1a', border: '1px solid #333', borderRadius: 6, padding: 2 }}>
             <button
               onClick={() => setViewMode('grouped')}
@@ -706,6 +1001,32 @@ export default function AnnotationsPage() {
             }}
             style={{ ...inputStyle, width: 200 }}
           />
+          <button
+            onClick={() => setShowFilterPanel(!showFilterPanel)}
+            style={{
+              ...secondaryBtnStyle,
+              ...(showFilterPanel ? { background: '#e74c3c', borderColor: '#e74c3c', color: '#fff' } : {}),
+              position: 'relative',
+            }}
+          >
+            🏷️ 标签
+            {selectedTags.length > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: -6,
+                right: -6,
+                background: '#e74c3c',
+                color: '#fff',
+                fontSize: 10,
+                padding: '1px 5px',
+                borderRadius: 8,
+                minWidth: 16,
+                textAlign: 'center',
+              }}>
+                {selectedTags.length}
+              </span>
+            )}
+          </button>
           <button onClick={goToSearchPage} style={secondaryBtnStyle} title="高级搜索">
             🔍 高级
           </button>
@@ -714,6 +1035,73 @@ export default function AnnotationsPage() {
           </button>
         </div>
       </div>
+
+      {showFilterPanel && tagsInUse.length > 0 && (
+        <div style={{
+          background: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: 8,
+          padding: 16,
+          marginBottom: 20,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: '#aaa' }}>按标签筛选</span>
+            {selectedTags.length > 0 && (
+              <button
+                onClick={clearFilterTags}
+                style={{
+                  background: 'none',
+                  border: '1px solid #555',
+                  borderRadius: 4,
+                  color: '#888',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  padding: '2px 10px',
+                }}
+              >
+                清除筛选
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {tagsInUse.map((tagInfo) => {
+              const isActive = selectedTags.includes(tagInfo.name);
+              const color = tagInfo.color || getTagColor(tagInfo.name);
+              return (
+                <button
+                  key={tagInfo.name}
+                  onClick={() => toggleFilterTag(tagInfo.name)}
+                  style={{
+                    padding: '4px 12px',
+                    background: isActive ? color : `${color}20`,
+                    border: `1px solid ${isActive ? color : `${color}50`}`,
+                    borderRadius: 14,
+                    color: isActive ? '#fff' : color,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: color,
+                      flexShrink: 0,
+                    }}
+                  />
+                  {tagInfo.name}
+                  {isActive && ' ✕'}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleCreate} style={formStyle}>
@@ -731,13 +1119,8 @@ export default function AnnotationsPage() {
             onChange={(e) => setForm({ ...form, note: e.target.value })}
             style={{ ...inputStyle, minHeight: 60 }}
           />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <input
-              placeholder="标签"
-              value={form.tag}
-              onChange={(e) => setForm({ ...form, tag: e.target.value })}
-              style={inputStyle}
-            />
+          {renderTagSelector()}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <input
               placeholder="场次"
               type="number"
@@ -899,12 +1282,12 @@ export default function AnnotationsPage() {
           {!groupedData ? (
             <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>加载中...</div>
           ) : viewMode === 'grouped' ? (
-            visibleGroups.length === 0 ? (
+            filteredVisibleGroups.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>
-                {searchQuery ? '未找到匹配的批注' : '暂无批注'}
+                {searchQuery || selectedTags.length > 0 ? '未找到匹配的批注' : '暂无批注'}
               </div>
             ) : (
-              visibleGroups.map((g) => {
+              filteredVisibleGroups.map((g) => {
                 const key = g.sceneNumber == null ? 'null' : String(g.sceneNumber);
                 return (
                   <div
@@ -973,7 +1356,7 @@ export default function AnnotationsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {allAnnotationsFlat.length === 0 ? (
                 <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>
-                  {searchQuery ? '未找到匹配的批注' : '暂无批注'}
+                  {searchQuery || selectedTags.length > 0 ? '未找到匹配的批注' : '暂无批注'}
                 </div>
               ) : (
                 allAnnotationsFlat.map(renderAnnotationCard)

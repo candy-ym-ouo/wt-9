@@ -166,6 +166,7 @@ export const api = {
       return request<any>(`/annotations/grouped/by-scene${params}`);
     },
     get: (id: number) => request<any>(`/annotations/${id}`),
+    getTags: () => request<{ name: string; color: string | null }[]>('/annotations/meta/tags'),
     create: (data: any) =>
       request<any>('/annotations', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) =>
@@ -235,7 +236,7 @@ export const api = {
       const q = searchParams.toString();
       return request<any>(`/search${q ? '?' + q : ''}`);
     },
-    getTags: () => request<string[]>('/search/meta/tags'),
+    getTags: () => request<{ name: string; color: string | null }[]>('/search/meta/tags'),
   },
   reminders: {
     summary: () => request<any>('/reminders/summary'),
@@ -295,5 +296,8 @@ export const api = {
     reject: (id: number, rejectionReason: string) =>
       request<any>(`/leaves/${id}/reject`, { method: 'POST', body: JSON.stringify({ rejectionReason }) }),
     statistics: () => request<any>('/leaves/statistics'),
+  },
+  dashboard: {
+    overview: () => request<any>('/dashboard/overview'),
   },
 };

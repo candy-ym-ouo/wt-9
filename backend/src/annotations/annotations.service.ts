@@ -26,6 +26,7 @@ export class AnnotationsService {
       startOffset: annotation.startOffset,
       endOffset: annotation.endOffset,
       tag: annotation.tag,
+      tagColor: annotation.tagColor,
       sceneNumber: annotation.sceneNumber,
       createdBy: annotation.createdBy,
       action,
@@ -163,6 +164,7 @@ export class AnnotationsService {
       startOffset: version.startOffset,
       endOffset: version.endOffset,
       tag: version.tag,
+      tagColor: version.tagColor,
       sceneNumber: version.sceneNumber,
     });
 
@@ -180,6 +182,19 @@ export class AnnotationsService {
 
     await this.createVersion(annotation, VersionAction.DELETE, userId);
     return this.repo.delete(id);
+  }
+
+  async getAllTags() {
+    const annotations = await this.repo.find({ select: ['tag', 'tagColor'] });
+    const tagMap = new Map<string, string | null>();
+    annotations.forEach((a) => {
+      if (a.tag && !tagMap.has(a.tag)) {
+        tagMap.set(a.tag, a.tagColor || null);
+      }
+    });
+    return Array.from(tagMap.entries())
+      .map(([name, color]) => ({ name, color }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
   }
 
   searchInScript(query: string, annotations: Annotation[]) {

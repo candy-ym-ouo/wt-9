@@ -20,6 +20,9 @@ export class Annotation {
   @Column({ nullable: true })
   tag: string;
 
+  @Column({ nullable: true })
+  tagColor: string;
+
   @Column({ type: 'simple-json', nullable: true })
   materialIds: number[];
 

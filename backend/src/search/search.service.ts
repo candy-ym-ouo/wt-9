@@ -426,22 +426,28 @@ export class SearchService {
 
   async getAllTags() {
     const [annotations, materials] = await Promise.all([
-      this.annotationRepo.find({ select: ['tag'] }),
+      this.annotationRepo.find({ select: ['tag', 'tagColor'] }),
       this.materialRepo.find({ select: ['tags'] }),
     ]);
 
-    const tagSet = new Set<string>();
+    const tagMap = new Map<string, string | null>();
 
     annotations.forEach((a) => {
-      if (a.tag) tagSet.add(a.tag);
+      if (a.tag && !tagMap.has(a.tag)) {
+        tagMap.set(a.tag, a.tagColor || null);
+      }
     });
 
     materials.forEach((m) => {
       if (m.tags && Array.isArray(m.tags)) {
-        m.tags.forEach((t) => tagSet.add(t));
+        m.tags.forEach((t) => {
+          if (!tagMap.has(t)) tagMap.set(t, null);
+        });
       }
     });
 
-    return Array.from(tagSet).sort();
+    return Array.from(tagMap.entries())
+      .map(([name, color]) => ({ name, color }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
   }
 }

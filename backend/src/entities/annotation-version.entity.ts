@@ -32,6 +32,9 @@ export class AnnotationVersion {
   tag: string;
 
   @Column({ nullable: true })
+  tagColor: string;
+
+  @Column({ nullable: true })
   sceneNumber: number;
 
   @Column({ nullable: true })

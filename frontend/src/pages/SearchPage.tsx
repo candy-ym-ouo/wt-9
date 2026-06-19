@@ -2,6 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 
+interface TagInfo {
+  name: string;
+  color: string | null;
+}
+
 interface SearchResult {
   rehearsals: any[];
   roles: any[];
@@ -82,7 +87,20 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [allTags, setAllTags] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<TagInfo[]>([]);
+
+  const SEARCH_FILTER_KEY = 'search_filter_state';
+
+  const getTagColor = (tagName: string): string => {
+    const found = allTags.find((t) => t.name === tagName);
+    if (found?.color) return found.color;
+    let hash = 0;
+    for (let i = 0; i < tagName.length; i++) {
+      hash = tagName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = ['#3498db', '#e74c3c', '#e67e22', '#2ecc71', '#9b59b6', '#f1c40f', '#1abc9c', '#e91e63'];
+    return colors[Math.abs(hash) % colors.length];
+  };
 
   const urlModules = searchParams.get('modules');
   const urlQ = searchParams.get('q') || '';
@@ -136,6 +154,19 @@ export default function SearchPage() {
     if (!groupByModule) params.groupBy = 'false';
     if (viewMode !== 'grouped') params.viewMode = viewMode;
     setSearchParams(params, { replace: false });
+    try {
+      localStorage.setItem(SEARCH_FILTER_KEY, JSON.stringify({
+        selectedModules: selectedModules.length < 4 ? selectedModules : null,
+        dateFrom: dateFrom || null,
+        dateTo: dateTo || null,
+        dateField: dateField !== 'createdAt' ? dateField : null,
+        selectedTags: selectedTags.length > 0 ? selectedTags : null,
+        sortBy: sortBy !== 'relevance' ? sortBy : null,
+        sortOrder: sortOrder !== 'desc' ? sortOrder : null,
+        groupByModule: !groupByModule ? false : null,
+        viewMode: viewMode !== 'grouped' ? viewMode : null,
+      }));
+    } catch {}
   };
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -201,6 +232,7 @@ export default function SearchPage() {
     setSortBy('relevance');
     setSortOrder('desc');
     setQuery('');
+    try { localStorage.removeItem(SEARCH_FILTER_KEY); } catch {}
   };
 
   const formatDate = (d: string | Date) => new Date(d).toLocaleString('zh-CN');
@@ -463,31 +495,39 @@ export default function SearchPage() {
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={filterLabelStyle}>标签筛选</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {allTags.map((tag) => (
-                    <label
-                      key={tag}
-                      style={{
-                        ...tagStyle,
-                        background: selectedTags.includes(tag)
-                          ? '#e74c3c30'
-                          : '#2a2a2a',
-                        borderColor: selectedTags.includes(tag)
-                          ? '#e74c3c'
-                          : '#333',
-                        color: selectedTags.includes(tag)
-                          ? '#e74c3c'
-                          : '#aaa',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedTags.includes(tag)}
-                        onChange={() => toggleTag(tag)}
-                        style={{ display: 'none' }}
-                      />
-                      🏷️ {tag}
-                    </label>
-                  ))}
+                  {allTags.map((tagInfo) => {
+                    const tagColor = tagInfo.color || getTagColor(tagInfo.name);
+                    const isSelected = selectedTags.includes(tagInfo.name);
+                    return (
+                      <label
+                        key={tagInfo.name}
+                        style={{
+                          ...tagStyle,
+                          background: isSelected ? `${tagColor}30` : '#2a2a2a',
+                          borderColor: isSelected ? tagColor : '#333',
+                          color: isSelected ? tagColor : '#aaa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleTag(tagInfo.name)}
+                          style={{ display: 'none' }}
+                        />
+                        <span style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: tagColor,
+                          flexShrink: 0,
+                        }} />
+                        {tagInfo.name}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -777,15 +817,17 @@ export default function SearchPage() {
                             {a.tag && (
                               <span
                                 style={{
-                                  background: '#333',
-                                  color: '#aaa',
-                                  padding: '2px 6px',
-                                  borderRadius: 8,
+                                  background: a.tagColor || getTagColor(a.tag),
+                                  color: '#fff',
+                                  padding: '2px 8px',
+                                  borderRadius: 10,
                                   fontSize: 11,
-                                  display: 'inline-block',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
                                 }}
                               >
-                                🏷️ {a.tag}
+                                {a.tag}
                               </span>
                             )}
                             {a.sceneNumber && (
@@ -982,20 +1024,23 @@ export default function SearchPage() {
                         <span>📅 {formatDate(item.date)}</span>
                         {item.tags && item.tags.length > 0 && (
                           <div style={{ display: 'flex', gap: 4 }}>
-                            {item.tags.map((t: string, i: number) => (
-                              <span
-                                key={i}
-                                style={{
-                                  background: '#2a2a2a',
-                                  color: '#888',
-                                  padding: '1px 6px',
-                                  borderRadius: 6,
-                                  fontSize: 11,
-                                }}
-                              >
-                                🏷️ {t}
-                              </span>
-                            ))}
+                            {item.tags.map((t: string, i: number) => {
+                              const tColor = (item.type === 'annotation' && item.raw?.tagColor) ? item.raw.tagColor : getTagColor(t);
+                              return (
+                                <span
+                                  key={i}
+                                  style={{
+                                    background: item.type === 'annotation' ? tColor : '#2a2a2a',
+                                    color: item.type === 'annotation' ? '#fff' : '#888',
+                                    padding: '1px 6px',
+                                    borderRadius: 6,
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  {t}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
