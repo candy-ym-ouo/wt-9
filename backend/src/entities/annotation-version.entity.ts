@@ -46,7 +46,7 @@ export class AnnotationVersion {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => Annotation, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Annotation)
   @JoinColumn({ name: 'annotationId' })
   annotation: Annotation;
 }

@@ -68,8 +68,6 @@ export class AnnotationsController {
   }
 
   @Delete(':id')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   remove(@Param('id') id: number, @Request() req: any) {
     return this.service.remove(id, req.user.userId, req.user.role);
   }
