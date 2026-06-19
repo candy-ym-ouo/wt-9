@@ -110,15 +110,31 @@ export const api = {
       request<any>(`/annotations/${id}/versions/${versionId}/restore`, { method: 'POST' }),
   },
   materials: {
-    list: (category?: string) => {
-      const params = category ? `?category=${category}` : '';
-      return request<any[]>(`/materials${params}`);
+    list: (params?: { category?: string; categories?: string; tags?: string; keyword?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.category) searchParams.set('category', params.category);
+      if (params?.categories) searchParams.set('categories', params.categories);
+      if (params?.tags) searchParams.set('tags', params.tags);
+      if (params?.keyword) searchParams.set('keyword', params.keyword);
+      const q = searchParams.toString();
+      return request<any[]>(`/materials${q ? '?' + q : ''}`);
     },
     get: (id: number) => request<any>(`/materials/${id}`),
-    upload: (file: File, category?: string, description?: string) =>
-      uploadFile('/materials/upload', file, { category: category || 'general', description: description || '' }),
+    upload: (file: File, params?: { category?: string; description?: string; categories?: string; tags?: string; downloadRoles?: string }) => {
+      const uploadParams: Record<string, string> = {};
+      if (params?.category) uploadParams.category = params.category;
+      if (params?.description) uploadParams.description = params.description;
+      if (params?.categories) uploadParams.categories = params.categories;
+      if (params?.tags) uploadParams.tags = params.tags;
+      if (params?.downloadRoles) uploadParams.downloadRoles = params.downloadRoles;
+      return uploadFile('/materials/upload', file, uploadParams);
+    },
+    update: (id: number, data: any) =>
+      request<any>(`/materials/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
     download: (id: number) => downloadFile(id),
+    getCategories: () => request<string[]>('/materials/meta/categories'),
+    getTags: () => request<string[]>('/materials/meta/tags'),
   },
   search: {
     query: (q: string) => request<any>(`/search?q=${encodeURIComponent(q)}`),

@@ -9,6 +9,18 @@ interface User {
   createdAt: string;
 }
 
+interface MaterialItem {
+  id: number;
+  originalName: string;
+  categories: string[];
+  tags: string[];
+  downloadRoles: string[];
+  description: string;
+  mimeType: string;
+  size: number;
+  category: string;
+}
+
 const ROLES = [
   { value: 'admin', label: '管理员' },
   { value: 'director', label: '导演' },
@@ -16,11 +28,19 @@ const ROLES = [
   { value: 'viewer', label: '观察者' },
 ];
 
+const ROLE_LABELS: Record<string, string> = { admin: '管理员', director: '导演', actor: '演员', viewer: '观察者' };
+
 export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', role: 'actor', displayName: '' });
   const [leaveStats, setLeaveStats] = useState<any>(null);
+
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editData, setEditData] = useState<{ categories: string; tags: string; downloadRoles: string[]; description: string }>({
+    categories: '', tags: '', downloadRoles: [], description: '',
+  });
 
   const load = async () => {
     const [usersData, statsData] = await Promise.all([
@@ -31,7 +51,12 @@ export default function AdminPage() {
     setLeaveStats(statsData);
   };
 
-  useEffect(() => { load(); }, []);
+  const loadMaterials = async () => {
+    const data = await api.materials.list();
+    setMaterials(data);
+  };
+
+  useEffect(() => { load(); loadMaterials(); }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,9 +71,48 @@ export default function AdminPage() {
     load();
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDeleteUser = async (id: number) => {
     await api.users.remove(id);
     load();
+  };
+
+  const startEdit = (m: MaterialItem) => {
+    setEditingId(m.id);
+    setEditData({
+      categories: (m.categories || []).join(', '),
+      tags: (m.tags || []).join(', '),
+      downloadRoles: m.downloadRoles || [],
+      description: m.description || '',
+    });
+  };
+
+  const saveEdit = async (id: number) => {
+    const categories = editData.categories.split(',').map((c) => c.trim()).filter(Boolean);
+    const tags = editData.tags.split(',').map((t) => t.trim()).filter(Boolean);
+    await api.materials.update(id, {
+      categories,
+      category: categories[0] || 'general',
+      tags,
+      downloadRoles: editData.downloadRoles,
+      description: editData.description,
+    });
+    setEditingId(null);
+    loadMaterials();
+  };
+
+  const toggleEditRole = (role: string) => {
+    setEditData((prev) => ({
+      ...prev,
+      downloadRoles: prev.downloadRoles.includes(role)
+        ? prev.downloadRoles.filter((r) => r !== role)
+        : [...prev.downloadRoles, role],
+    }));
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
   };
 
   const roleLabel = (r: string) => ROLES.find((ro) => ro.value === r)?.label || r;
@@ -105,7 +169,7 @@ export default function AdminPage() {
                   </select>
                 </td>
                 <td style={tdStyle}>
-                  <button onClick={() => handleDelete(u.id)} style={deleteBtnStyle}>删除</button>
+                  <button onClick={() => handleDeleteUser(u.id)} style={deleteBtnStyle}>删除</button>
                 </td>
               </tr>
             ))}
@@ -161,6 +225,107 @@ export default function AdminPage() {
           )}
         </div>
       )}
+
+      <div style={{ marginTop: 32 }}>
+        <h3 style={{ margin: '0 0 16px', color: '#e0e0e0', fontSize: 16 }}>素材库管理</h3>
+        <div style={{ background: '#1a1a1a', borderRadius: 8, border: '1px solid #333', overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #333' }}>
+                <th style={thStyle}>ID</th>
+                <th style={thStyle}>文件名</th>
+                <th style={thStyle}>大小</th>
+                <th style={thStyle}>分类</th>
+                <th style={thStyle}>标签</th>
+                <th style={thStyle}>下载权限</th>
+                <th style={thStyle}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {materials.map((m) => (
+                <tr key={m.id} style={{ borderBottom: '1px solid #222' }}>
+                  <td style={tdStyle}>{m.id}</td>
+                  <td style={{ ...tdStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.originalName}</td>
+                  <td style={tdStyle}>{formatSize(m.size)}</td>
+                  {editingId === m.id ? (
+                    <>
+                      <td style={tdStyle}>
+                        <input
+                          value={editData.categories}
+                          onChange={(e) => setEditData({ ...editData, categories: e.target.value })}
+                          placeholder="逗号分隔"
+                          style={{ ...inputStyle, padding: '4px 8px', width: 120, fontSize: 12 }}
+                        />
+                      </td>
+                      <td style={tdStyle}>
+                        <input
+                          value={editData.tags}
+                          onChange={(e) => setEditData({ ...editData, tags: e.target.value })}
+                          placeholder="逗号分隔"
+                          style={{ ...inputStyle, padding: '4px 8px', width: 120, fontSize: 12 }}
+                        />
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {ROLES.map((r) => (
+                            <button
+                              key={r.value}
+                              onClick={() => toggleEditRole(r.value)}
+                              style={{
+                                ...roleChipStyle,
+                                background: editData.downloadRoles.includes(r.value) ? '#2ecc71' : '#222',
+                                color: editData.downloadRoles.includes(r.value) ? '#fff' : '#aaa',
+                                borderColor: editData.downloadRoles.includes(r.value) ? '#2ecc71' : '#444',
+                              }}
+                            >
+                              {r.label}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => saveEdit(m.id)} style={saveBtnStyle}>保存</button>
+                          <button onClick={() => setEditingId(null)} style={cancelBtnStyle}>取消</button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                          {(m.categories || (m.category ? [m.category] : [])).map((c) => (
+                            <span key={c} style={catTagStyle}>{c}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                          {(m.tags || []).map((t) => (
+                            <span key={t} style={labelTagStyle}>#{t}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        {m.downloadRoles && m.downloadRoles.length > 0
+                          ? m.downloadRoles.map((r) => ROLE_LABELS[r] || r).join(', ')
+                          : '所有人'}
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => startEdit(m)} style={editBtnStyle}>编辑</button>
+                          <button onClick={async () => { await api.materials.remove(m.id); loadMaterials(); }} style={deleteBtnStyle}>删除</button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {materials.length === 0 && <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>暂无素材</div>}
+      </div>
     </div>
   );
 }
@@ -224,4 +389,60 @@ const statCardStyle: React.CSSProperties = {
   border: '1px solid #333',
   padding: 16,
   textAlign: 'center',
+};
+
+const editBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #3498db',
+  color: '#3498db',
+  padding: '4px 10px',
+  borderRadius: 4,
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const saveBtnStyle: React.CSSProperties = {
+  background: '#2ecc71',
+  border: 'none',
+  color: '#fff',
+  padding: '4px 10px',
+  borderRadius: 4,
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const cancelBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #888',
+  color: '#888',
+  padding: '4px 10px',
+  borderRadius: 4,
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const roleChipStyle: React.CSSProperties = {
+  padding: '2px 6px',
+  border: '1px solid #444',
+  borderRadius: 10,
+  cursor: 'pointer',
+  fontSize: 11,
+};
+
+const catTagStyle: React.CSSProperties = {
+  fontSize: 11,
+  padding: '1px 5px',
+  borderRadius: 6,
+  background: '#3a1a1a',
+  color: '#e74c3c',
+  border: '1px solid #5a2a2a',
+};
+
+const labelTagStyle: React.CSSProperties = {
+  fontSize: 11,
+  padding: '1px 5px',
+  borderRadius: 6,
+  background: '#1a2a3a',
+  color: '#3498db',
+  border: '1px solid #2a3a5a',
 };

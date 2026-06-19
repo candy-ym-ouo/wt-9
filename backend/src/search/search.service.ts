@@ -45,13 +45,9 @@ export class SearchService {
           { tag: Like(likeQuery) },
         ],
       }),
-      this.materialRepo.find({
-        where: [
-          { originalName: Like(likeQuery) },
-          { description: Like(likeQuery) },
-          { category: Like(likeQuery) },
-        ],
-      }),
+      this.materialRepo.createQueryBuilder('m')
+        .where('m.originalName LIKE :q OR m.description LIKE :q OR m.category LIKE :q OR m.categories LIKE :q OR m.tags LIKE :q', { q: likeQuery })
+        .getMany(),
     ]);
 
     const rehearsalsWithConflicts = await this.rehearsalsService.enrichWithConflictInfo(rehearsals);

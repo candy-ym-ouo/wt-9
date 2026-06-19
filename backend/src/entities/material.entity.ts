@@ -20,6 +20,15 @@ export class Material {
   @Column({ nullable: true })
   category: string;
 
+  @Column({ type: 'simple-json', nullable: true, default: '[]' })
+  categories: string[];
+
+  @Column({ type: 'simple-json', nullable: true, default: '[]' })
+  tags: string[];
+
+  @Column({ type: 'simple-json', nullable: true, default: '[]' })
+  downloadRoles: string[];
+
   @Column({ type: 'text', nullable: true })
   description: string;
 
