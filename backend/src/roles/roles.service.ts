@@ -61,6 +61,15 @@ export class RolesService {
     return this.findOne(roleId);
   }
 
+  async updatePriorities(updates: Array<{ id: number; priority: number }>) {
+    await Promise.all(
+      updates.map(({ id, priority }) =>
+        this.repo.update(id, { priority }),
+      ),
+    );
+    return this.findAll();
+  }
+
   private async enrichWithUserInfo(roles: CastRole[]): Promise<any[]> {
     const userIds = new Set<number>();
     roles.forEach((r) => {

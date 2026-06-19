@@ -33,6 +33,9 @@ export default function RolesPage() {
     actorId: 0,
     priority: 0,
   });
+  const [sortMode, setSortMode] = useState(false);
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
   const { isDirector, isAdmin } = useAuth();
   const canEdit = isDirector || isAdmin;
 
@@ -79,6 +82,65 @@ export default function RolesPage() {
     load();
   };
 
+  const handleDragStart = (e: React.DragEvent, id: number) => {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(id));
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverId !== id) {
+      setDragOverId(id);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: number) => {
+    e.preventDefault();
+    setDragOverId(null);
+    setDraggedId(null);
+
+    if (!draggedId || draggedId === targetId) return;
+
+    const newRoles = [...roles];
+    const draggedIndex = newRoles.findIndex((r) => r.id === draggedId);
+    const targetIndex = newRoles.findIndex((r) => r.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const [draggedItem] = newRoles.splice(draggedIndex, 1);
+    newRoles.splice(targetIndex, 0, draggedItem);
+
+    const updatedRoles = newRoles.map((r, index) => ({ ...r, priority: index }));
+    setRoles(updatedRoles);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverId(null);
+  };
+
+  const handleSaveSort = async () => {
+    const updates = roles.map((r, index) => ({ id: r.id, priority: index }));
+    try {
+      const result = await api.roles.updatePriorities(updates);
+      setRoles(result);
+      setSortMode(false);
+    } catch (err: any) {
+      alert('保存排序失败: ' + err.message);
+    }
+  };
+
+  const handleCancelSort = () => {
+    load();
+    setSortMode(false);
+  };
+
   const getActorName = (actorId: number | null) => {
     if (!actorId) return '未分配';
     const u = users.find((u) => u.id === actorId);
@@ -109,12 +171,43 @@ export default function RolesPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h2 style={{ margin: 0, color: '#e0e0e0' }}>角色分配</h2>
-        {canEdit && (
-          <button onClick={() => setShowForm(!showForm)} style={primaryBtnStyle}>
-            {showForm ? '取消' : '+ 新角色'}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {canEdit && !sortMode && (
+            <>
+              <button onClick={() => setSortMode(true)} style={secondaryBtnStyle}>
+                调整排序
+              </button>
+              <button onClick={() => setShowForm(!showForm)} style={primaryBtnStyle}>
+                {showForm ? '取消' : '+ 新角色'}
+              </button>
+            </>
+          )}
+          {sortMode && (
+            <>
+              <button onClick={handleCancelSort} style={secondaryBtnStyle}>
+                取消
+              </button>
+              <button onClick={handleSaveSort} style={primaryBtnStyle}>
+                保存排序
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {sortMode && (
+        <div style={{
+          padding: '10px 16px',
+          background: 'rgba(231, 76, 60, 0.1)',
+          border: '1px solid rgba(231, 76, 60, 0.3)',
+          borderRadius: 6,
+          marginBottom: 16,
+          fontSize: 13,
+          color: '#e74c3c',
+        }}>
+          💡 拖拽角色卡片调整优先级顺序，调整完成后点击"保存排序"
+        </div>
+      )}
 
       {showForm && canEdit && (
         <form onSubmit={handleCreate} style={formStyle}>
@@ -136,16 +229,66 @@ export default function RolesPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-        {roles.map((r) => {
+        {roles.map((r, index) => {
           const status = statusLabel(r);
           const availableActors = getAvailableActorsForSubstitute(r);
+          const isDragging = draggedId === r.id;
+          const isDragOver = dragOverId === r.id;
           return (
-            <div key={r.id} style={cardStyle}>
+            <div
+              key={r.id}
+              draggable={sortMode}
+              onDragStart={(e) => sortMode && handleDragStart(e, r.id)}
+              onDragOver={(e) => sortMode && handleDragOver(e, r.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => sortMode && handleDrop(e, r.id)}
+              onDragEnd={handleDragEnd}
+              style={{
+                ...cardStyle,
+                opacity: isDragging ? 0.5 : 1,
+                border: isDragOver ? '2px dashed #e74c3c' : cardStyle.border as string,
+                cursor: sortMode ? 'move' : 'default',
+                transform: isDragging ? 'rotate(2deg)' : 'none',
+                transition: 'transform 0.2s, opacity 0.2s',
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <h3 style={{ margin: '0 0 8px', color: '#e74c3c', fontSize: 16 }}>{r.characterName}</h3>
-                {canEdit && (
-                  <button onClick={() => handleDelete(r.id)} style={deleteBtnStyle}>删除</button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {sortMode && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 24,
+                      height: 24,
+                      background: 'rgba(231, 76, 60, 0.2)',
+                      color: '#e74c3c',
+                      borderRadius: '50%',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}>
+                      {index + 1}
+                    </span>
+                  )}
+                  <h3 style={{ margin: '0 0 8px', color: '#e74c3c', fontSize: 16 }}>{r.characterName}</h3>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                  {sortMode && (
+                    <span style={{
+                    cursor: 'move',
+                    color: '#888',
+                    fontSize: 18,
+                    lineHeight: 1,
+                    padding: '2px 4px',
+                    userSelect: 'none',
+                  }}>
+                    ⋮⋮
+                  </span>
+                  )}
+                  {canEdit && !sortMode && (
+                    <button onClick={() => handleDelete(r.id)} style={deleteBtnStyle}>删除</button>
+                  )}
+                </div>
               </div>
               {r.characterDescription && (
                 <p style={{ fontSize: 13, color: '#888', margin: '0 0 12px' }}>{r.characterDescription}</p>
@@ -299,6 +442,16 @@ const primaryBtnStyle: React.CSSProperties = {
   border: 'none',
   borderRadius: 6,
   color: '#fff',
+  cursor: 'pointer',
+  fontSize: 14,
+};
+
+const secondaryBtnStyle: React.CSSProperties = {
+  padding: '8px 16px',
+  background: 'transparent',
+  border: '1px solid #555',
+  borderRadius: 6,
+  color: '#e0e0e0',
   cursor: 'pointer',
   fontSize: 14,
 };

@@ -76,4 +76,13 @@ export class RolesController {
   ) {
     return this.service.removeSubstitute(roleId, actorId);
   }
+
+  @Put('priorities/batch')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  updatePriorities(
+    @Body() body: { updates: Array<{ id: number; priority: number }> },
+  ) {
+    return this.service.updatePriorities(body.updates);
+  }
 }

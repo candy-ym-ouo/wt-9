@@ -126,6 +126,8 @@ export const api = {
       request<any>(`/roles/${roleId}/substitutes`, { method: 'POST', body: JSON.stringify({ actorId }) }),
     removeSubstitute: (roleId: number, actorId: number) =>
       request<any>(`/roles/${roleId}/substitutes/${actorId}`, { method: 'DELETE' }),
+    updatePriorities: (updates: Array<{ id: number; priority: number }>) =>
+      request<any[]>('/roles/priorities/batch', { method: 'PUT', body: JSON.stringify({ updates }) }),
   },
   annotations: {
     list: (scene?: string) => {
