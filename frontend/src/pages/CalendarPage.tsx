@@ -121,6 +121,11 @@ export default function CalendarPage() {
   const [expandedRehearsalId, setExpandedRehearsalId] = useState<number | null>(null);
   const [attendanceEdits, setAttendanceEdits] = useState<Record<number, { status: 'present' | 'absent' | 'late' | null; absentReason?: string }>>({});
   const [savingAttendance, setSavingAttendance] = useState(false);
+  const [showCopyPanel, setShowCopyPanel] = useState(false);
+  const [lastWeekRehearsals, setLastWeekRehearsals] = useState<Rehearsal[]>([]);
+  const [loadingLastWeek, setLoadingLastWeek] = useState(false);
+  const [copyingId, setCopyingId] = useState<number | null>(null);
+  const [copyingAll, setCopyingAll] = useState(false);
   const { user, isDirector, isAdmin } = useAuth();
 
   const load = async () => {
@@ -135,6 +140,76 @@ export default function CalendarPage() {
     }
     const data = await api.rehearsals.list(params);
     setRehearsals(data);
+  };
+
+  const loadLastWeekRehearsals = async () => {
+    setLoadingLastWeek(true);
+    try {
+      const data = await api.rehearsals.getLastWeekSchedule();
+      setLastWeekRehearsals(data);
+    } catch (e) {
+      console.error('加载上周排练失败', e);
+    } finally {
+      setLoadingLastWeek(false);
+    }
+  };
+
+  const handleCopySingle = async (id: number) => {
+    setCopyingId(id);
+    try {
+      await api.rehearsals.copyToNextWeek(id);
+      await load();
+    } catch (e: any) {
+      alert('复制失败：' + (e.message || '未知错误'));
+    } finally {
+      setCopyingId(null);
+    }
+  };
+
+  const handleCopyAll = async () => {
+    if (!confirm('确定要复制上周所有排练到本周吗？')) return;
+    setCopyingAll(true);
+    try {
+      const result = await api.rehearsals.copyLastWeekAll();
+      await load();
+      let msg = `成功复制 ${result.created.length} 个排练`;
+      if (result.skipped && result.skipped.length > 0) {
+        msg += `\n跳过 ${result.skipped.length} 个：\n` + result.skipped.map((s: any) => `• ${s.rehearsal.title}: ${s.reason}`).join('\n');
+      }
+      alert(msg);
+      setShowCopyPanel(false);
+    } catch (e: any) {
+      alert('批量复制失败：' + (e.message || '未知错误'));
+    } finally {
+      setCopyingAll(false);
+    }
+  };
+
+  const handleCopyToForm = (r: Rehearsal) => {
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const newStart = new Date(new Date(r.startTime).getTime() + ONE_WEEK_MS);
+    const newEnd = new Date(new Date(r.endTime).getTime() + ONE_WEEK_MS);
+    setForm({
+      title: r.title,
+      description: r.description || '',
+      startTime: formatLocalInput(newStart.toISOString()),
+      endTime: formatLocalInput(newEnd.toISOString()),
+      location: r.location || '',
+      participantIds: r.participantIds || [],
+      materialIds: r.materialIds || [],
+    });
+    setEditingId(null);
+    setShowForm(true);
+    setShowCopyPanel(false);
+    setError(null);
+    setConflictInfo(null);
+  };
+
+  const toggleCopyPanel = () => {
+    if (!showCopyPanel) {
+      loadLastWeekRehearsals();
+    }
+    setShowCopyPanel(!showCopyPanel);
   };
 
   const hasActiveFilters =
@@ -423,6 +498,22 @@ export default function CalendarPage() {
           </button>
           {canEdit && (
             <button
+              onClick={toggleCopyPanel}
+              style={{
+                padding: '8px 16px',
+                background: showCopyPanel ? 'rgba(155, 89, 182, 0.2)' : 'transparent',
+                border: '1px solid #9b59b6',
+                borderRadius: 6,
+                color: '#9b59b6',
+                cursor: 'pointer',
+                fontSize: 14,
+              }}
+            >
+              📋 复制上周安排
+            </button>
+          )}
+          {canEdit && (
+            <button
               onClick={() => showForm ? resetForm() : setShowForm(true)}
               style={{
                 padding: '8px 16px',
@@ -458,6 +549,142 @@ export default function CalendarPage() {
           boxSizing: 'border-box',
         }}
       />
+
+      {showCopyPanel && canEdit && (
+        <div style={{
+          background: '#1a1a1a',
+          padding: 20,
+          borderRadius: 8,
+          border: '1px solid #9b59b6',
+          marginBottom: 24,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0, color: '#e0e0e0', fontSize: 16 }}>
+              📋 上周排练安排
+            </h3>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleCopyAll}
+                disabled={copyingAll || lastWeekRehearsals.length === 0}
+                style={{
+                  padding: '6px 14px',
+                  background: '#9b59b6',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#fff',
+                  cursor: copyingAll || lastWeekRehearsals.length === 0 ? 'not-allowed' : 'pointer',
+                  fontSize: 13,
+                  opacity: copyingAll || lastWeekRehearsals.length === 0 ? 0.6 : 1,
+                }}
+              >
+                {copyingAll ? '复制中...' : '一键复制全部到本周'}
+              </button>
+              <button
+                onClick={toggleCopyPanel}
+                style={{
+                  padding: '6px 14px',
+                  background: 'transparent',
+                  border: '1px solid #555',
+                  borderRadius: 6,
+                  color: '#aaa',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+
+          {loadingLastWeek && (
+            <div style={{ textAlign: 'center', padding: 32, color: '#888' }}>
+              ⏳ 加载上周排练中...
+            </div>
+          )}
+
+          {!loadingLastWeek && lastWeekRehearsals.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 32, color: '#666' }}>
+              上周没有排练安排
+            </div>
+          )}
+
+          {!loadingLastWeek && lastWeekRehearsals.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {lastWeekRehearsals.map((r, idx) => (
+                <div
+                  key={r.id}
+                  style={{
+                    background: '#222',
+                    borderRadius: 6,
+                    padding: 12,
+                    borderLeft: `3px solid ${colorPool[idx % colorPool.length]}`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#e0e0e0', fontWeight: 500, marginBottom: 4 }}>
+                      {r.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#888' }}>
+                      {formatDate(r.startTime)} → {formatDate(r.endTime)}
+                      {r.location && <span style={{ marginLeft: 12 }}>📍 {r.location}</span>}
+                    </div>
+                    {r.participantIds && r.participantIds.length > 0 && (
+                      <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                        👥 {r.participantIds.map((id) => getUserName(id)).join('、')}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginLeft: 12 }}>
+                    <button
+                      onClick={() => handleCopyToForm(r)}
+                      style={{
+                        padding: '4px 10px',
+                        background: 'transparent',
+                        border: '1px solid #3498db',
+                        borderRadius: 4,
+                        color: '#3498db',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                      }}
+                    >
+                      编辑后创建
+                    </button>
+                    <button
+                      onClick={() => handleCopySingle(r.id)}
+                      disabled={copyingId === r.id}
+                      style={{
+                        padding: '4px 10px',
+                        background: '#2ecc71',
+                        border: 'none',
+                        borderRadius: 4,
+                        color: '#fff',
+                        cursor: copyingId === r.id ? 'not-allowed' : 'pointer',
+                        fontSize: 12,
+                        opacity: copyingId === r.id ? 0.6 : 1,
+                      }}
+                    >
+                      {copyingId === r.id ? '复制中...' : '直接复制'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #333', fontSize: 12, color: '#666' }}>
+            💡 提示：
+            <ul style={{ margin: '6px 0 0 20px', padding: 0 }}>
+              <li>「直接复制」会自动将时间加7天，立即创建新排练</li>
+              <li>「编辑后创建」会填充到表单中，可修改后再提交</li>
+              <li>复制时会自动检查地点冲突，冲突的排练会被跳过</li>
+              <li>参与人、地点、素材都会自动带出</li>
+            </ul>
+          </div>
+        </div>
+      )}
 
       {showFilters && (
         <div style={{

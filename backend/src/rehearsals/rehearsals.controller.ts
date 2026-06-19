@@ -41,6 +41,43 @@ export class RehearsalsController {
     return this.service.getStatistics(start, end);
   }
 
+  @Get('last-week/schedule')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  async getLastWeekSchedule() {
+    const rehearsals = await this.service.getLastWeekRehearsals();
+    const withConflicts = await this.service.enrichWithConflictInfo(rehearsals);
+    const withParticipants = await this.service.enrichWithParticipantInfo(rehearsals);
+    return withConflicts.map((r, i) => ({ ...r, ...withParticipants[i] }));
+  }
+
+  @Post(':id/copy-to-next-week')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  async copyToNextWeek(
+    @Param('id') id: number,
+    @Request() req: any,
+  ) {
+    try {
+      return await this.service.copyRehearsalToNextWeek(id, req.user.userId, req.user.username);
+    } catch (e: any) {
+      throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Post('copy-last-week-all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  async copyLastWeekAll(
+    @Request() req: any,
+  ) {
+    try {
+      return await this.service.copyLastWeekAll(req.user.userId, req.user.username);
+    } catch (e: any) {
+      throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
   @Post('check-conflicts')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)

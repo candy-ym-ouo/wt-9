@@ -132,6 +132,12 @@ export const api = {
       const q = searchParams.toString();
       return request<any>(`/rehearsals/statistics/summary${q ? '?' + q : ''}`);
     },
+    getLastWeekSchedule: () =>
+      request<any[]>('/rehearsals/last-week/schedule'),
+    copyToNextWeek: (id: number) =>
+      request<any>(`/rehearsals/${id}/copy-to-next-week`, { method: 'POST' }),
+    copyLastWeekAll: () =>
+      request<any>('/rehearsals/copy-last-week-all', { method: 'POST' }),
   },
   roles: {
     list: () => request<any[]>('/roles'),

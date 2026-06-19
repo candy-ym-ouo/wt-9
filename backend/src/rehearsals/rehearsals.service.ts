@@ -614,6 +614,116 @@ export class RehearsalsService {
     return this.findOneWithDetails(id);
   }
 
+  getLastWeekRange(): { start: Date; end: Date } {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() + diffToMonday);
+    thisMonday.setHours(0, 0, 0, 0);
+
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(thisMonday.getDate() - 7);
+    const lastSunday = new Date(thisMonday);
+    lastSunday.setMilliseconds(-1);
+
+    return { start: lastMonday, end: lastSunday };
+  }
+
+  async getLastWeekRehearsals(): Promise<Rehearsal[]> {
+    const { start, end } = this.getLastWeekRange();
+    const all = await this.repo.find({ order: { startTime: 'ASC' } });
+    return all.filter((r) =>
+      this.isTimeOverlap(start, end, r.startTime, r.endTime),
+    );
+  }
+
+  async copyRehearsalToNextWeek(
+    sourceId: number,
+    operatorId?: number,
+    operatorName?: string,
+  ): Promise<Rehearsal> {
+    const source = await this.repo.findOne({ where: { id: sourceId } });
+    if (!source) {
+      throw new BadRequestException('源排练不存在');
+    }
+
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const newStartTime = new Date(source.startTime.getTime() + ONE_WEEK_MS);
+    const newEndTime = new Date(source.endTime.getTime() + ONE_WEEK_MS);
+
+    if (source.location && source.location.trim()) {
+      const conflict = await this.checkConflicts(
+        newStartTime,
+        newEndTime,
+        [],
+        undefined,
+        source.location,
+      );
+      if (conflict.locationConflicts.length > 0) {
+        const titles = conflict.locationConflicts.map((r) => r.title).join('、');
+        throw new BadRequestException(`地点「${source.location}」在下周同一时间段已被占用：${titles}`);
+      }
+    }
+
+    const newRehearsal = this.repo.create({
+      title: source.title,
+      description: source.description,
+      startTime: newStartTime,
+      endTime: newEndTime,
+      location: source.location,
+      participantIds: source.participantIds || [],
+      materialIds: source.materialIds || [],
+      createdBy: operatorId,
+    });
+
+    const saved = await this.repo.save(newRehearsal);
+
+    if (operatorId !== undefined) {
+      const timeStr = `${newStartTime.toLocaleString('zh-CN')} ~ ${newEndTime.toLocaleString('zh-CN')}`;
+      await this.auditLogsService.log({
+        action: AuditAction.CREATE_REHEARSAL,
+        module: AuditModule.REHEARSAL,
+        operatorId,
+        operatorName,
+        targetId: saved.id,
+        targetType: 'rehearsal',
+        detail: `复制排练「${source.title}」(${source.location || '无地点'}, ${timeStr})`,
+        metadata: {
+          sourceId,
+          title: saved.title,
+          location: saved.location,
+          startTime: saved.startTime,
+          endTime: saved.endTime,
+          participantIds: saved.participantIds,
+          materialIds: saved.materialIds,
+        },
+      });
+    }
+
+    return saved;
+  }
+
+  async copyLastWeekAll(
+    operatorId?: number,
+    operatorName?: string,
+  ): Promise<{ created: Rehearsal[]; skipped: Array<{ rehearsal: Rehearsal; reason: string }> }> {
+    const lastWeekRehearsals = await this.getLastWeekRehearsals();
+    const created: Rehearsal[] = [];
+    const skipped: Array<{ rehearsal: Rehearsal; reason: string }> = [];
+
+    for (const r of lastWeekRehearsals) {
+      try {
+        const newR = await this.copyRehearsalToNextWeek(r.id, operatorId, operatorName);
+        created.push(newR);
+      } catch (e: any) {
+        skipped.push({ rehearsal: r, reason: e.message });
+      }
+    }
+
+    return { created, skipped };
+  }
+
   async getStatistics(start?: string, end?: string): Promise<RehearsalStatistics> {
     let rehearsals = await this.repo.find({ order: { startTime: 'ASC' } });
 
