@@ -20,6 +20,11 @@ export class RolesController {
     return this.service.findOne(id);
   }
 
+  @Get(':id/rehearsals')
+  getRoleRehearsals(@Param('id') id: number) {
+    return this.service.getRoleRehearsals(id);
+  }
+
   @Post()
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)

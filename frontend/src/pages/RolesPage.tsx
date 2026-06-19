@@ -41,6 +41,10 @@ export default function RolesPage() {
   const [sortMode, setSortMode] = useState(false);
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [keyword, setKeyword] = useState(searchParams.get('q') || '');
+  const [expandedRoleId, setExpandedRoleId] = useState<number | null>(null);
+  const [roleRehearsals, setRoleRehearsals] = useState<Record<number, any[]>>({});
+  const [loadingRehearsals, setLoadingRehearsals] = useState<Record<number, boolean>>({});
   const { isDirector, isAdmin } = useAuth();
   const canEdit = isDirector || isAdmin;
 
@@ -189,6 +193,25 @@ export default function RolesPage() {
   const handleCancelSort = () => {
     load();
     setSortMode(false);
+  };
+
+  const toggleRehearsalsExpand = async (roleId: number) => {
+    if (expandedRoleId === roleId) {
+      setExpandedRoleId(null);
+    } else {
+      setExpandedRoleId(roleId);
+      if (!roleRehearsals[roleId]) {
+        setLoadingRehearsals((prev) => ({ ...prev, [roleId]: true }));
+        try {
+          const data = await api.roles.getRehearsals(roleId);
+          setRoleRehearsals((prev) => ({ ...prev, [roleId]: data }));
+        } catch (e) {
+          console.error('加载角色排练失败', e);
+        } finally {
+          setLoadingRehearsals((prev) => ({ ...prev, [roleId]: false }));
+        }
+      }
+    }
   };
 
   const getActorName = (actorId: number | null) => {
@@ -471,6 +494,96 @@ export default function RolesPage() {
               {r.sceneNumbers && r.sceneNumbers.length > 0 && (
                 <div style={{ fontSize: 12, color: '#555', marginTop: 12 }}>
                   场次: {r.sceneNumbers.join(', ')}
+                </div>
+              )}
+
+              <div style={{ marginTop: 12 }}>
+                <button
+                  onClick={() => toggleRehearsalsExpand(r.id)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 12px',
+                    background: 'rgba(52, 152, 219, 0.1)',
+                    border: '1px solid rgba(52, 152, 219, 0.3)',
+                    borderRadius: 6,
+                    color: '#3498db',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                  }}
+                >
+                  {expandedRoleId === r.id ? '收起排练' : `查看参与排练 (${roleRehearsals[r.id]?.length || '?'})`}
+                </button>
+              </div>
+
+              {expandedRoleId === r.id && (
+                <div style={{
+                  marginTop: 10,
+                  padding: '10px 12px',
+                  background: 'rgba(52, 152, 219, 0.05)',
+                  border: '1px solid rgba(52, 152, 219, 0.2)',
+                  borderRadius: 6,
+                }}>
+                  {loadingRehearsals[r.id] && (
+                    <div style={{ textAlign: 'center', color: '#888', fontSize: 12, padding: 8 }}>
+                      加载中...
+                    </div>
+                  )}
+                  {!loadingRehearsals[r.id] && roleRehearsals[r.id]?.length === 0 && (
+                    <div style={{ textAlign: 'center', color: '#666', fontSize: 12, padding: 8 }}>
+                      暂无参与的排练
+                    </div>
+                  )}
+                  {!loadingRehearsals[r.id] && roleRehearsals[r.id]?.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {roleRehearsals[r.id].slice(0, 5).map((rehearsal: any) => (
+                        <div key={rehearsal.id} style={{
+                          background: '#222',
+                          padding: '8px 10px',
+                          borderRadius: 4,
+                          fontSize: 12,
+                        }}>
+                          <div style={{ color: '#e0e0e0', fontWeight: 500, marginBottom: 2 }}>
+                            {rehearsal.title}
+                            {rehearsal.isMainActor && (
+                              <span style={{
+                                marginLeft: 8,
+                                padding: '1px 6px',
+                                background: 'rgba(46, 204, 113, 0.2)',
+                                border: '1px solid #2ecc71',
+                                color: '#2ecc71',
+                                borderRadius: 8,
+                                fontSize: 10,
+                              }}>
+                                主演
+                              </span>
+                            )}
+                            {rehearsal.isSubstitute && !rehearsal.isMainActor && (
+                              <span style={{
+                                marginLeft: 8,
+                                padding: '1px 6px',
+                                background: 'rgba(243, 156, 18, 0.2)',
+                                border: '1px solid #f39c12',
+                                color: '#f39c12',
+                                borderRadius: 8,
+                                fontSize: 10,
+                              }}>
+                                替补
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ color: '#888', fontSize: 11 }}>
+                            {new Date(rehearsal.startTime).toLocaleString('zh-CN')}
+                            {rehearsal.location && <span style={{ marginLeft: 8 }}>📍 {rehearsal.location}</span>}
+                          </div>
+                        </div>
+                      ))}
+                      {roleRehearsals[r.id].length > 5 && (
+                        <div style={{ textAlign: 'center', color: '#666', fontSize: 11 }}>
+                          还有 {roleRehearsals[r.id].length - 5} 个排练...
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

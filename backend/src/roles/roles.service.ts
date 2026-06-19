@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CastRole, User, AuditAction, AuditModule } from '../entities';
+import { CastRole, User, Rehearsal, AuditAction, AuditModule } from '../entities';
 import { LeavesService } from '../leaves/leaves.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
@@ -12,6 +12,8 @@ export class RolesService {
     private repo: Repository<CastRole>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(Rehearsal)
+    private rehearsalRepo: Repository<Rehearsal>,
     private leavesService: LeavesService,
     private auditLogsService: AuditLogsService,
   ) {}
@@ -44,6 +46,41 @@ export class RolesService {
     if (!role) return null;
     const enriched = await this.enrichWithUserInfo([role]);
     return enriched[0];
+  }
+
+  async findOneWithRehearsals(id: number) {
+    const role = await this.repo.findOne({ where: { id } });
+    if (!role) return null;
+    const enriched = await this.enrichWithUserInfo([role]);
+    const rehearsals = await this.getRoleRehearsals(id);
+    return { ...enriched[0], rehearsals };
+  }
+
+  async getRoleRehearsals(roleId: number) {
+    const role = await this.repo.findOne({ where: { id: roleId } });
+    if (!role) return [];
+
+    const allRehearsals = await this.rehearsalRepo.find({ order: { startTime: 'DESC' } });
+    const actorIds = new Set<number>();
+    if (role.actorId) actorIds.add(role.actorId);
+    (role.substituteActorIds || []).forEach((id) => actorIds.add(id));
+
+    const result = allRehearsals.filter((r) => {
+      const participants = r.participantIds || [];
+      return participants.some((pid) => actorIds.has(pid));
+    });
+
+    return result.map((r) => ({
+      id: r.id,
+      title: r.title,
+      startTime: r.startTime,
+      endTime: r.endTime,
+      location: r.location,
+      isMainActor: role.actorId ? (r.participantIds || []).includes(role.actorId) : false,
+      isSubstitute: (role.substituteActorIds || []).some((sid) =>
+        (r.participantIds || []).includes(sid),
+      ),
+    }));
   }
 
   async update(id: number, data: Partial<CastRole>, operatorId: number, operatorName: string) {

@@ -551,7 +551,85 @@ export class RehearsalsService {
     }
     const enriched = await this.enrichWithParticipantInfo([rehearsal]);
     const withConflict = await this.enrichWithConflictInfo([rehearsal]);
-    return { ...enriched[0], ...withConflict[0] };
+    const roleAssignments = await this.getRoleAssignments(id);
+    return { ...enriched[0], ...withConflict[0], roleAssignments };
+  }
+
+  async getRoleAssignments(rehearsalId: number) {
+    const rehearsal = await this.repo.findOne({ where: { id: rehearsalId } });
+    if (!rehearsal) return [];
+
+    const participantIds = rehearsal.participantIds || [];
+    const allRoles = await this.roleRepo.find({ order: { priority: 'ASC' } });
+    const users = await this.userRepo.findByIds(participantIds);
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    const roleAssignments: Array<{
+      roleId: number;
+      characterName: string;
+      characterDescription?: string;
+      priority: number;
+      mainActor?: {
+        id: number;
+        username: string;
+        displayName?: string;
+        isParticipating: boolean;
+        attendanceStatus?: 'present' | 'absent' | 'late' | null;
+      };
+      substitutes: Array<{
+        id: number;
+        username: string;
+        displayName?: string;
+        isParticipating: boolean;
+        attendanceStatus?: 'present' | 'absent' | 'late' | null;
+      }>;
+    }> = [];
+
+    const attendance = rehearsal.attendance || {};
+
+    for (const role of allRoles) {
+      const assignment: any = {
+        roleId: role.id,
+        characterName: role.characterName,
+        characterDescription: role.characterDescription,
+        priority: role.priority,
+        substitutes: [],
+      };
+
+      if (role.actorId) {
+        const user = userMap.get(role.actorId);
+        const userAttendance = attendance[String(role.actorId)] || attendance[role.actorId];
+        assignment.mainActor = {
+          id: role.actorId,
+          username: user?.username,
+          displayName: user?.displayName,
+          isParticipating: participantIds.includes(role.actorId),
+          attendanceStatus: userAttendance?.status ?? null,
+        };
+      }
+
+      for (const subId of role.substituteActorIds || []) {
+        const user = userMap.get(subId);
+        const userAttendance = attendance[String(subId)] || attendance[subId];
+        assignment.substitutes.push({
+          id: subId,
+          username: user?.username,
+          displayName: user?.displayName,
+          isParticipating: participantIds.includes(subId),
+          attendanceStatus: userAttendance?.status ?? null,
+        });
+      }
+
+      const hasParticipation =
+        assignment.mainActor?.isParticipating ||
+        assignment.substitutes.some((s: any) => s.isParticipating);
+
+      if (hasParticipation) {
+        roleAssignments.push(assignment);
+      }
+    }
+
+    return roleAssignments;
   }
 
   async updateAttendance(id: number, updates: AttendanceUpdate[], operatorId?: number, operatorName?: string) {

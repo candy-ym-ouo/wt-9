@@ -119,6 +119,9 @@ export default function CalendarPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [keyword, setKeyword] = useState(searchParams.get('q') || '');
   const [expandedRehearsalId, setExpandedRehearsalId] = useState<number | null>(null);
+  const [expandedRolesId, setExpandedRolesId] = useState<number | null>(null);
+  const [roleAssignments, setRoleAssignments] = useState<Record<number, any[]>>({});
+  const [loadingRoles, setLoadingRoles] = useState<Record<number, boolean>>({});
   const [attendanceEdits, setAttendanceEdits] = useState<Record<number, { status: 'present' | 'absent' | 'late' | null; absentReason?: string }>>({});
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [showCopyPanel, setShowCopyPanel] = useState(false);
@@ -261,6 +264,25 @@ export default function CalendarPage() {
           };
         });
         setAttendanceEdits(edits);
+      }
+    }
+  };
+
+  const toggleRolesExpand = async (rehearsalId: number) => {
+    if (expandedRolesId === rehearsalId) {
+      setExpandedRolesId(null);
+    } else {
+      setExpandedRolesId(rehearsalId);
+      if (!roleAssignments[rehearsalId]) {
+        setLoadingRoles((prev) => ({ ...prev, [rehearsalId]: true }));
+        try {
+          const data = await api.rehearsals.getRoleAssignments(rehearsalId);
+          setRoleAssignments((prev) => ({ ...prev, [rehearsalId]: data }));
+        } catch (e) {
+          console.error('加载角色分工失败', e);
+        } finally {
+          setLoadingRoles((prev) => ({ ...prev, [rehearsalId]: false }));
+        }
       }
     }
   };
@@ -1023,22 +1045,38 @@ export default function CalendarPage() {
                       <div style={{ color: '#3498db', fontWeight: 600 }}>
                         签到: 出勤{r.presentCount || 0} | 缺席{r.absentCount || 0} | 迟到{r.lateCount || 0} | 未签{r.pendingAttendanceCount || 0}
                       </div>
-                      {canEdit && (
+                      <div style={{ display: 'flex', gap: 6 }}>
                         <button
-                          onClick={() => toggleAttendanceExpand(r.id)}
+                          onClick={() => toggleRolesExpand(r.id)}
                           style={{
                             padding: '2px 8px',
                             background: 'transparent',
-                            border: '1px solid #3498db',
+                            border: '1px solid #9b59b6',
                             borderRadius: 4,
-                            color: '#3498db',
+                            color: '#9b59b6',
                             cursor: 'pointer',
                             fontSize: 11,
                           }}
                         >
-                          {expandedRehearsalId === r.id ? '收起' : '管理签到'}
+                          {expandedRolesId === r.id ? '收起角色' : '角色分工'}
                         </button>
-                      )}
+                        {canEdit && (
+                          <button
+                            onClick={() => toggleAttendanceExpand(r.id)}
+                            style={{
+                              padding: '2px 8px',
+                              background: 'transparent',
+                              border: '1px solid #3498db',
+                              borderRadius: 4,
+                              color: '#3498db',
+                              cursor: 'pointer',
+                              fontSize: 11,
+                            }}
+                          >
+                            {expandedRehearsalId === r.id ? '收起签到' : '管理签到'}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {expandedRehearsalId === r.id && (
@@ -1141,6 +1179,128 @@ export default function CalendarPage() {
                             {savingAttendance ? '保存中...' : '保存签到'}
                           </button>
                         </div>
+                      </div>
+                    )}
+
+                    {expandedRolesId === r.id && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(155, 89, 182, 0.2)' }}>
+                        {loadingRoles[r.id] && (
+                          <div style={{ textAlign: 'center', color: '#888', fontSize: 12, padding: 8 }}>
+                            加载中...
+                          </div>
+                        )}
+                        {!loadingRoles[r.id] && roleAssignments[r.id]?.length === 0 && (
+                          <div style={{ textAlign: 'center', color: '#666', fontSize: 12, padding: 8 }}>
+                            暂无角色分工
+                          </div>
+                        )}
+                        {!loadingRoles[r.id] && roleAssignments[r.id]?.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {roleAssignments[r.id].map((role: any) => (
+                              <div key={role.roleId} style={{
+                                background: '#222',
+                                padding: '8px 10px',
+                                borderRadius: 4,
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                  <span style={{
+                                    color: '#e74c3c',
+                                    fontWeight: 600,
+                                    fontSize: 13,
+                                  }}>
+                                    {role.characterName}
+                                  </span>
+                                  {role.characterDescription && (
+                                    <span style={{ color: '#666', fontSize: 11 }}>
+                                      {role.characterDescription}
+                                    </span>
+                                  )}
+                                </div>
+                                {role.mainActor && (
+                                  <div style={{ fontSize: 12, marginBottom: 4 }}>
+                                    <span style={{ color: '#888' }}>主演: </span>
+                                    <span style={{
+                                      color: role.mainActor.isParticipating ? '#e0e0e0' : '#666',
+                                      textDecoration: role.mainActor.isParticipating ? 'none' : 'line-through',
+                                    }}>
+                                      {role.mainActor.displayName || role.mainActor.username}
+                                      {!role.mainActor.isParticipating && ' (未参加)'}
+                                    </span>
+                                    {role.mainActor.attendanceStatus && (
+                                      <span style={{
+                                        marginLeft: 6,
+                                        padding: '1px 6px',
+                                        background: role.mainActor.attendanceStatus === 'present'
+                                          ? 'rgba(46, 204, 113, 0.2)'
+                                          : role.mainActor.attendanceStatus === 'absent'
+                                          ? 'rgba(231, 76, 60, 0.2)'
+                                          : 'rgba(243, 156, 18, 0.2)',
+                                        border: `1px solid ${role.mainActor.attendanceStatus === 'present'
+                                          ? '#2ecc71'
+                                          : role.mainActor.attendanceStatus === 'absent'
+                                          ? '#e74c3c'
+                                          : '#f39c12'}`,
+                                        color: role.mainActor.attendanceStatus === 'present'
+                                          ? '#2ecc71'
+                                          : role.mainActor.attendanceStatus === 'absent'
+                                          ? '#e74c3c'
+                                          : '#f39c12',
+                                        borderRadius: 8,
+                                        fontSize: 10,
+                                      }}>
+                                        {role.mainActor.attendanceStatus === 'present' ? '出勤' :
+                                         role.mainActor.attendanceStatus === 'absent' ? '缺席' : '迟到'}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {role.substitutes && role.substitutes.length > 0 && (
+                                  <div style={{ fontSize: 12 }}>
+                                    <span style={{ color: '#888' }}>替补: </span>
+                                    {role.substitutes.map((sub: any, idx: number) => (
+                                      <span key={sub.id}>
+                                        {idx > 0 && '、'}
+                                        <span style={{
+                                          color: sub.isParticipating ? '#f39c12' : '#666',
+                                          textDecoration: sub.isParticipating ? 'none' : 'line-through',
+                                        }}>
+                                          {sub.displayName || sub.username}
+                                          {!sub.isParticipating && ' (未参加)'}
+                                        </span>
+                                        {sub.attendanceStatus && (
+                                          <span style={{
+                                            marginLeft: 4,
+                                            padding: '1px 4px',
+                                            background: sub.attendanceStatus === 'present'
+                                              ? 'rgba(46, 204, 113, 0.2)'
+                                              : sub.attendanceStatus === 'absent'
+                                              ? 'rgba(231, 76, 60, 0.2)'
+                                              : 'rgba(243, 156, 18, 0.2)',
+                                            border: `1px solid ${sub.attendanceStatus === 'present'
+                                              ? '#2ecc71'
+                                              : sub.attendanceStatus === 'absent'
+                                              ? '#e74c3c'
+                                              : '#f39c12'}`,
+                                            color: sub.attendanceStatus === 'present'
+                                              ? '#2ecc71'
+                                              : sub.attendanceStatus === 'absent'
+                                              ? '#e74c3c'
+                                              : '#f39c12',
+                                            borderRadius: 6,
+                                            fontSize: 10,
+                                          }}>
+                                            {sub.attendanceStatus === 'present' ? '出' :
+                                             sub.attendanceStatus === 'absent' ? '缺' : '迟'}
+                                          </span>
+                                        )}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 

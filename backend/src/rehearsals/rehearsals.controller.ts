@@ -139,6 +139,11 @@ export class RehearsalsController {
     return this.service.findOneWithDetails(id);
   }
 
+  @Get(':id/roles')
+  getRoleAssignments(@Param('id') id: number) {
+    return this.service.getRoleAssignments(id);
+  }
+
   @Put(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)

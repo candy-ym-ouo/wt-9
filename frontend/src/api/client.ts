@@ -116,6 +116,7 @@ export const api = {
       return request<any[]>(`/rehearsals${q ? '?' + q : ''}`);
     },
     get: (id: number) => request<any>(`/rehearsals/${id}`),
+    getRoleAssignments: (id: number) => request<any[]>(`/rehearsals/${id}/roles`),
     checkConflicts: (data: { startTime: string; endTime: string; participantIds?: number[]; excludeId?: number; location?: string }) =>
       request<any>('/rehearsals/check-conflicts', { method: 'POST', body: JSON.stringify(data) }),
     create: (data: any) =>
@@ -142,6 +143,7 @@ export const api = {
   roles: {
     list: () => request<any[]>('/roles'),
     get: (id: number) => request<any>(`/roles/${id}`),
+    getRehearsals: (id: number) => request<any[]>(`/roles/${id}/rehearsals`),
     create: (data: any) =>
       request<any>('/roles', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) =>
