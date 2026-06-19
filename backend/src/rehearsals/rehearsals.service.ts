@@ -85,22 +85,9 @@ export class RehearsalsService {
   async create(data: Partial<Rehearsal>) {
     const startTime = data.startTime instanceof Date ? data.startTime : new Date(data.startTime!);
     const endTime = data.endTime instanceof Date ? data.endTime : new Date(data.endTime!);
-    const participantIds = data.participantIds || [];
 
-    const conflict = await this.checkConflicts(startTime, endTime, participantIds);
-    if (conflict.hasConflict) {
-      const messages: string[] = [];
-      if (conflict.timeConflicts.length > 0) {
-        messages.push(
-          `时间与 ${conflict.timeConflicts.length} 个排练冲突: ${conflict.timeConflicts.map((r) => r.title).join(', ')}`,
-        );
-      }
-      if (conflict.participantConflicts.length > 0) {
-        messages.push(
-          `参与人占用冲突: ${conflict.participantConflicts.map((p) => `${p.userName || '用户#' + p.userId}在${p.conflictingRehearsals.map((r) => r.title).join('、')}已有安排`).join('; ')}`,
-        );
-      }
-      throw new BadRequestException(messages.join('; '));
+    if (startTime >= endTime) {
+      throw new BadRequestException('结束时间必须晚于开始时间');
     }
 
     const item = this.repo.create(data);
@@ -140,23 +127,12 @@ export class RehearsalsService {
         ? data.endTime
         : new Date(data.endTime)
       : existing.endTime;
-    const participantIds = data.participantIds ?? existing.participantIds ?? [];
 
-    const conflict = await this.checkConflicts(startTime, endTime, participantIds, id);
-    if (conflict.hasConflict) {
-      const messages: string[] = [];
-      if (conflict.timeConflicts.length > 0) {
-        messages.push(
-          `时间与 ${conflict.timeConflicts.length} 个排练冲突: ${conflict.timeConflicts.map((r) => r.title).join(', ')}`,
-        );
-      }
-      if (conflict.participantConflicts.length > 0) {
-        messages.push(
-          `参与人占用冲突: ${conflict.participantConflicts.map((p) => `${p.userName || '用户#' + p.userId}在${p.conflictingRehearsals.map((r) => r.title).join('、')}已有安排`).join('; ')}`,
-        );
-      }
-      throw new BadRequestException(messages.join('; '));
+    if (startTime >= endTime) {
+      throw new BadRequestException('结束时间必须晚于开始时间');
     }
+
+    const participantIds = data.participantIds ?? existing.participantIds ?? [];
 
     await this.repo.update(id, {
       ...data,
