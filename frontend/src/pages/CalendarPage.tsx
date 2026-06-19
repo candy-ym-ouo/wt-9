@@ -17,6 +17,20 @@ interface Rehearsal {
     userName?: string;
     conflictingRehearsals: Rehearsal[];
   }>;
+  participants?: Array<{
+    userId: number;
+    userName?: string;
+    displayName?: string;
+    isOnLeave: boolean;
+    leaveReason?: string;
+    substituteId?: number;
+    substituteName?: string;
+    roleId?: number;
+    roleName?: string;
+  }>;
+  onLeaveCount?: number;
+  withSubstituteCount?: number;
+  effectiveParticipants?: number[];
 }
 
 interface User {
@@ -355,6 +369,27 @@ export default function CalendarPage() {
                 {r.participantIds && r.participantIds.length > 0 && (
                   <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
                     👥 {r.participantIds.map((id) => getUserName(id)).join('、')}
+                  </div>
+                )}
+
+                {r.participants && r.participants.length > 0 && r.onLeaveCount && r.onLeaveCount > 0 && (
+                  <div style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    background: 'rgba(230, 126, 34, 0.08)',
+                    border: '1px solid rgba(230, 126, 34, 0.3)',
+                    borderRadius: 6,
+                    fontSize: 12,
+                  }}>
+                    <div style={{ color: '#e67e22', fontWeight: 600, marginBottom: 6 }}>
+                      请假: {r.onLeaveCount}人 | 替补: {r.withSubstituteCount}人
+                    </div>
+                    {r.participants.filter((p) => p.isOnLeave).map((p) => (
+                      <div key={p.userId} style={{ color: '#aaa', marginTop: 2 }}>
+                        • {p.displayName || p.userName} ({p.roleName || '演员'})
+                        {p.substituteName ? ` → 替补: ${p.substituteName}` : ' (无替补)'}
+                      </div>
+                    ))}
                   </div>
                 )}
                 {r.description && <p style={{ fontSize: 13, color: '#666', margin: '6px 0 0' }}>{r.description}</p>}

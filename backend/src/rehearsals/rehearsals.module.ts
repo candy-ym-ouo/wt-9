@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Rehearsal, User } from '../entities';
+import { Rehearsal, User, CastRole, LeaveRequest } from '../entities';
 import { RehearsalsService } from './rehearsals.service';
 import { RehearsalsController } from './rehearsals.controller';
+import { LeavesModule } from '../leaves/leaves.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Rehearsal, User])],
+  imports: [TypeOrmModule.forFeature([Rehearsal, User, CastRole, LeaveRequest]), LeavesModule],
   providers: [RehearsalsService],
   controllers: [RehearsalsController],
   exports: [RehearsalsService],

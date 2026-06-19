@@ -87,6 +87,10 @@ export const api = {
     update: (id: number, data: any) =>
       request<any>(`/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) => request<any>(`/roles/${id}`, { method: 'DELETE' }),
+    addSubstitute: (roleId: number, actorId: number) =>
+      request<any>(`/roles/${roleId}/substitutes`, { method: 'POST', body: JSON.stringify({ actorId }) }),
+    removeSubstitute: (roleId: number, actorId: number) =>
+      request<any>(`/roles/${roleId}/substitutes/${actorId}`, { method: 'DELETE' }),
   },
   annotations: {
     list: (scene?: string) => {
@@ -113,5 +117,28 @@ export const api = {
   },
   search: {
     query: (q: string) => request<any>(`/search?q=${encodeURIComponent(q)}`),
+  },
+  leaves: {
+    list: (params?: { actorId?: number; status?: string; roleId?: number; startDate?: string; endDate?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.actorId) searchParams.set('actorId', String(params.actorId));
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.roleId) searchParams.set('roleId', String(params.roleId));
+      if (params?.startDate) searchParams.set('startDate', params.startDate);
+      if (params?.endDate) searchParams.set('endDate', params.endDate);
+      const q = searchParams.toString();
+      return request<any[]>(`/leaves${q ? '?' + q : ''}`);
+    },
+    get: (id: number) => request<any>(`/leaves/${id}`),
+    create: (data: any) =>
+      request<any>('/leaves', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) =>
+      request<any>(`/leaves/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => request<any>(`/leaves/${id}`, { method: 'DELETE' }),
+    approve: (id: number, substituteActorId?: number) =>
+      request<any>(`/leaves/${id}/approve`, { method: 'POST', body: JSON.stringify({ substituteActorId }) }),
+    reject: (id: number, rejectionReason: string) =>
+      request<any>(`/leaves/${id}/reject`, { method: 'POST', body: JSON.stringify({ rejectionReason }) }),
+    statistics: () => request<any>('/leaves/statistics'),
   },
 };

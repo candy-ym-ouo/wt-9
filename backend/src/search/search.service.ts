@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { Rehearsal, CastRole, Annotation, Material } from '../entities';
 import { RehearsalsService } from '../rehearsals/rehearsals.service';
+import { RolesService } from '../roles/roles.service';
 
 @Injectable()
 export class SearchService {
@@ -16,6 +17,7 @@ export class SearchService {
     @InjectRepository(Material)
     private materialRepo: Repository<Material>,
     private rehearsalsService: RehearsalsService,
+    private rolesService: RolesService,
   ) {}
 
   async search(query: string) {
@@ -51,10 +53,24 @@ export class SearchService {
     ]);
 
     const rehearsalsWithConflicts = await this.rehearsalsService.enrichWithConflictInfo(rehearsals);
+    const rehearsalsWithParticipants = await this.rehearsalsService.enrichWithParticipantInfo(rehearsals);
+    const enrichedRehearsals = rehearsalsWithConflicts.map((r, i) => ({
+      ...r,
+      ...rehearsalsWithParticipants[i],
+    }));
+
+    const roleIds = roles.map((r) => r.id);
+    const enrichedRoles: any[] = [];
+    for (const roleId of roleIds) {
+      const roleDetail = await this.rolesService.findOne(roleId);
+      if (roleDetail) {
+        enrichedRoles.push(roleDetail);
+      }
+    }
 
     return {
-      rehearsals: rehearsalsWithConflicts,
-      roles,
+      rehearsals: enrichedRehearsals,
+      roles: enrichedRoles,
       annotations,
       materials,
       total: rehearsals.length + roles.length + annotations.length + materials.length,

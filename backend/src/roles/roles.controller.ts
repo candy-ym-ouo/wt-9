@@ -31,10 +31,16 @@ export class RolesController {
       actorId?: number;
       sceneNumbers?: number[];
       priority?: number;
+      substituteActorIds?: number[];
     },
     @Request() req: any,
   ) {
-    return this.service.create({ ...body, createdBy: req.user.userId, sceneNumbers: body.sceneNumbers || [] });
+    return this.service.create({
+      ...body,
+      createdBy: req.user.userId,
+      sceneNumbers: body.sceneNumbers || [],
+      substituteActorIds: body.substituteActorIds || [],
+    });
   }
 
   @Put(':id')
@@ -49,5 +55,25 @@ export class RolesController {
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   remove(@Param('id') id: number) {
     return this.service.remove(id);
+  }
+
+  @Post(':id/substitutes')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  addSubstitute(
+    @Param('id') roleId: number,
+    @Body() body: { actorId: number },
+  ) {
+    return this.service.addSubstitute(roleId, body.actorId);
+  }
+
+  @Delete(':id/substitutes/:actorId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  removeSubstitute(
+    @Param('id') roleId: number,
+    @Param('actorId') actorId: number,
+  ) {
+    return this.service.removeSubstitute(roleId, actorId);
   }
 }

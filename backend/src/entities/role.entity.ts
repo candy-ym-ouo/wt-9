@@ -15,6 +15,9 @@ export class CastRole {
   actorId: number;
 
   @Column({ type: 'simple-json', nullable: true })
+  substituteActorIds: number[];
+
+  @Column({ type: 'simple-json', nullable: true })
   sceneNumbers: number[];
 
   @Column({ default: 0 })

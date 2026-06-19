@@ -18,12 +18,14 @@ export class RehearsalsController {
     } else {
       rehearsals = await this.service.findAll();
     }
-    return this.service.enrichWithConflictInfo(rehearsals);
+    const withConflicts = await this.service.enrichWithConflictInfo(rehearsals);
+    const withParticipants = await this.service.enrichWithParticipantInfo(rehearsals);
+    return withConflicts.map((r, i) => ({ ...r, ...withParticipants[i] }));
   }
 
   @Get(':id')
   findOne(@Param('id') id: number) {
-    return this.service.findOne(id);
+    return this.service.findOneWithDetails(id);
   }
 
   @Post('check-conflicts')

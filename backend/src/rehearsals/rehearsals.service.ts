@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, Not } from 'typeorm';
-import { Rehearsal, User } from '../entities';
+import { Rehearsal, User, CastRole, LeaveRequest, LeaveStatus } from '../entities';
+import { LeavesService } from '../leaves/leaves.service';
 
 export interface ConflictInfo {
   hasConflict: boolean;
@@ -13,6 +14,18 @@ export interface ConflictInfo {
   }>;
 }
 
+export interface ParticipantInfo {
+  userId: number;
+  userName?: string;
+  displayName?: string;
+  isOnLeave: boolean;
+  leaveReason?: string;
+  substituteId?: number;
+  substituteName?: string;
+  roleId?: number;
+  roleName?: string;
+}
+
 @Injectable()
 export class RehearsalsService {
   constructor(
@@ -20,6 +33,9 @@ export class RehearsalsService {
     private repo: Repository<Rehearsal>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(CastRole)
+    private roleRepo: Repository<CastRole>,
+    private leavesService: LeavesService,
   ) {}
 
   async checkConflicts(
@@ -164,5 +180,98 @@ export class RehearsalsService {
       });
     }
     return result;
+  }
+
+  async getParticipantsWithLeaveInfo(rehearsal: Rehearsal): Promise<ParticipantInfo[]> {
+    const participantIds = rehearsal.participantIds || [];
+    if (participantIds.length === 0) {
+      return [];
+    }
+
+    const users = await this.userRepo.findByIds(participantIds);
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    const activeLeaves = await this.leavesService.getActiveLeavesForDateRange(
+      rehearsal.startTime,
+      rehearsal.endTime,
+    );
+
+    const roles = await this.roleRepo.find();
+    const roleByActor = new Map<number, CastRole>();
+    roles.forEach((role) => {
+      if (role.actorId) {
+        roleByActor.set(role.actorId, role);
+      }
+    });
+
+    const result: ParticipantInfo[] = [];
+    for (const userId of participantIds) {
+      const user = userMap.get(userId);
+      const leave = activeLeaves.find((l) => l.actorId === userId);
+      const role = roleByActor.get(userId);
+
+      let substituteId: number | undefined;
+      let substituteName: string | undefined;
+
+      if (leave && leave.substituteActorId) {
+        substituteId = leave.substituteActorId;
+        const subUser = userMap.get(leave.substituteActorId);
+        substituteName = subUser?.displayName || subUser?.username;
+      } else if (role?.substituteActorIds && role.substituteActorIds.length > 0) {
+        const availableSub = role.substituteActorIds.find((subId) => {
+          const subLeave = activeLeaves.find((l) => l.actorId === subId);
+          return !subLeave;
+        });
+        if (availableSub) {
+          substituteId = availableSub;
+          const subUser = userMap.get(availableSub);
+          substituteName = subUser?.displayName || subUser?.username;
+        }
+      }
+
+      result.push({
+        userId,
+        userName: user?.username,
+        displayName: user?.displayName,
+        isOnLeave: !!leave,
+        leaveReason: leave?.reason,
+        substituteId,
+        substituteName,
+        roleId: role?.id,
+        roleName: role?.characterName,
+      });
+    }
+
+    return result;
+  }
+
+  async enrichWithParticipantInfo(rehearsals: Rehearsal[]): Promise<any[]> {
+    const result: any[] = [];
+    for (const r of rehearsals) {
+      const participants = await this.getParticipantsWithLeaveInfo(r);
+      const onLeaveCount = participants.filter((p) => p.isOnLeave).length;
+      const withSubstituteCount = participants.filter((p) => p.substituteId).length;
+
+      result.push({
+        ...r,
+        participants,
+        onLeaveCount,
+        withSubstituteCount,
+        effectiveParticipants: participants
+          .map((p) => (p.isOnLeave && p.substituteId ? p.substituteId : p.userId))
+          .filter((id, index, arr) => arr.indexOf(id) === index),
+      });
+    }
+    return result;
+  }
+
+  async findOneWithDetails(id: number) {
+    const rehearsal = await this.repo.findOne({ where: { id } });
+    if (!rehearsal) {
+      return null;
+    }
+    const enriched = await this.enrichWithParticipantInfo([rehearsal]);
+    const withConflict = await this.enrichWithConflictInfo([rehearsal]);
+    return { ...enriched[0], ...withConflict[0] };
   }
 }
