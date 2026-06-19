@@ -51,6 +51,7 @@ export class RehearsalsController {
       endTime: string;
       participantIds?: number[];
       excludeId?: number;
+      location?: string;
     },
   ) {
     return this.service.checkConflicts(
@@ -58,6 +59,7 @@ export class RehearsalsController {
       new Date(body.endTime),
       body.participantIds || [],
       body.excludeId,
+      body.location,
     );
   }
 

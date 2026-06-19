@@ -12,6 +12,7 @@ export interface ConflictInfo {
     userName?: string;
     conflictingRehearsals: Rehearsal[];
   }>;
+  locationConflicts: Rehearsal[];
 }
 
 export interface ParticipantInfo {
@@ -74,6 +75,7 @@ export class RehearsalsService {
     endTime: Date,
     participantIds: number[] = [],
     excludeId?: number,
+    location?: string,
   ): Promise<ConflictInfo> {
     if (startTime >= endTime) {
       throw new BadRequestException('结束时间必须晚于开始时间');
@@ -113,10 +115,28 @@ export class RehearsalsService {
       }
     }
 
+    const locationConflicts: Rehearsal[] = [];
+    if (location && location.trim()) {
+      const trimmedLocation = location.trim().toLowerCase();
+      for (const r of otherRehearsals) {
+        if (
+          r.location &&
+          r.location.trim().toLowerCase() === trimmedLocation &&
+          this.isTimeOverlap(startTime, endTime, r.startTime, r.endTime)
+        ) {
+          locationConflicts.push(r);
+        }
+      }
+    }
+
     return {
-      hasConflict: timeConflicts.length > 0 || participantConflicts.length > 0,
+      hasConflict:
+        timeConflicts.length > 0 ||
+        participantConflicts.length > 0 ||
+        locationConflicts.length > 0,
       timeConflicts,
       participantConflicts,
+      locationConflicts,
     };
   }
 
@@ -145,6 +165,20 @@ export class RehearsalsService {
         const foundIds = materials.map((m) => m.id);
         const missingIds = uniqueIds.filter((id) => !foundIds.includes(id));
         throw new BadRequestException(`素材ID不存在: ${missingIds.join(', ')}`);
+      }
+    }
+
+    if (data.location && data.location.trim()) {
+      const conflict = await this.checkConflicts(
+        startTime,
+        endTime,
+        [],
+        undefined,
+        data.location,
+      );
+      if (conflict.locationConflicts.length > 0) {
+        const titles = conflict.locationConflicts.map((r) => r.title).join('、');
+        throw new BadRequestException(`地点「${data.location}」在此时间段已被占用：${titles}`);
       }
     }
 
@@ -287,6 +321,21 @@ export class RehearsalsService {
       materialIds = uniqueIds;
     }
 
+    const location = data.location !== undefined ? data.location : existing.location;
+    if (location && location.trim()) {
+      const conflict = await this.checkConflicts(
+        startTime,
+        endTime,
+        [],
+        id,
+        location,
+      );
+      if (conflict.locationConflicts.length > 0) {
+        const titles = conflict.locationConflicts.map((r) => r.title).join('、');
+        throw new BadRequestException(`地点「${location}」在此时间段已被占用：${titles}`);
+      }
+    }
+
     await this.repo.update(id, {
       ...data,
       startTime,
@@ -309,12 +358,14 @@ export class RehearsalsService {
         r.endTime,
         r.participantIds || [],
         r.id,
+        r.location,
       );
       result.push({
         ...r,
         hasConflict: conflict.hasConflict,
         timeConflicts: conflict.timeConflicts,
         participantConflicts: conflict.participantConflicts,
+        locationConflicts: conflict.locationConflicts,
       });
     }
     return result;

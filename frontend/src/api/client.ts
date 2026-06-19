@@ -97,7 +97,7 @@ export const api = {
       return request<any[]>(`/rehearsals${q ? '?' + q : ''}`);
     },
     get: (id: number) => request<any>(`/rehearsals/${id}`),
-    checkConflicts: (data: { startTime: string; endTime: string; participantIds?: number[]; excludeId?: number }) =>
+    checkConflicts: (data: { startTime: string; endTime: string; participantIds?: number[]; excludeId?: number; location?: string }) =>
       request<any>('/rehearsals/check-conflicts', { method: 'POST', body: JSON.stringify(data) }),
     create: (data: any) =>
       request<any>('/rehearsals', { method: 'POST', body: JSON.stringify(data) }),

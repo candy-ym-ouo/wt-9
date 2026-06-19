@@ -18,6 +18,7 @@ interface Rehearsal {
     userName?: string;
     conflictingRehearsals: Rehearsal[];
   }>;
+  locationConflicts?: Rehearsal[];
   participants?: Array<{
     userId: number;
     userName?: string;
@@ -64,6 +65,7 @@ interface ConflictInfo {
     userName?: string;
     conflictingRehearsals: Rehearsal[];
   }>;
+  locationConflicts: Rehearsal[];
 }
 
 const emptyForm = {
@@ -241,6 +243,7 @@ export default function CalendarPage() {
           endTime: new Date(form.endTime).toISOString(),
           participantIds: form.participantIds,
           excludeId: editingId ?? undefined,
+          location: form.location,
         });
         setConflictInfo(info);
       } catch (e) {
@@ -250,7 +253,7 @@ export default function CalendarPage() {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [form.startTime, form.endTime, form.participantIds, showForm, editingId]);
+  }, [form.startTime, form.endTime, form.participantIds, form.location, showForm, editingId]);
 
   const startEdit = (r: Rehearsal) => {
     setEditingId(r.id);
@@ -494,9 +497,38 @@ export default function CalendarPage() {
           </h3>
 
           <input placeholder="标题" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required style={inputStyle} />
-          <input placeholder="地点" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={inputStyle} />
-          <input type="datetime-local" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} required style={inputStyle} />
-          <input type="datetime-local" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} required style={inputStyle} />
+          <input
+            placeholder="地点"
+            value={form.location}
+            onChange={(e) => setForm({ ...form, location: e.target.value })}
+            style={{
+              ...inputStyle,
+              borderColor: conflictInfo?.locationConflicts?.length ? '#e74c3c' : undefined,
+              boxShadow: conflictInfo?.locationConflicts?.length ? '0 0 0 2px rgba(231, 76, 60, 0.2)' : undefined,
+            }}
+          />
+          <input
+            type="datetime-local"
+            value={form.startTime}
+            onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+            required
+            style={{
+              ...inputStyle,
+              borderColor: (conflictInfo?.locationConflicts?.length || conflictInfo?.timeConflicts?.length || conflictInfo?.participantConflicts?.length) ? '#e74c3c' : undefined,
+              boxShadow: (conflictInfo?.locationConflicts?.length || conflictInfo?.timeConflicts?.length || conflictInfo?.participantConflicts?.length) ? '0 0 0 2px rgba(231, 76, 60, 0.2)' : undefined,
+            }}
+          />
+          <input
+            type="datetime-local"
+            value={form.endTime}
+            onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+            required
+            style={{
+              ...inputStyle,
+              borderColor: (conflictInfo?.locationConflicts?.length || conflictInfo?.timeConflicts?.length || conflictInfo?.participantConflicts?.length) ? '#e74c3c' : undefined,
+              boxShadow: (conflictInfo?.locationConflicts?.length || conflictInfo?.timeConflicts?.length || conflictInfo?.participantConflicts?.length) ? '0 0 0 2px rgba(231, 76, 60, 0.2)' : undefined,
+            }}
+          />
           <textarea placeholder="描述" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ ...inputStyle, gridColumn: '1 / -1', minHeight: 60 }} />
 
           <div style={{ gridColumn: '1 / -1' }}>
@@ -574,13 +606,19 @@ export default function CalendarPage() {
 
           {checkingConflict && (
             <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(52, 152, 219, 0.1)', border: '1px solid #3498db', borderRadius: 6, color: '#3498db', fontSize: 13 }}>
-              ⏳ 正在检查时间和参与人冲突...
+              ⏳ 正在检查时间、地点和参与人冲突...
             </div>
           )}
 
           {!checkingConflict && conflictInfo && conflictInfo.hasConflict && (
             <div style={{ gridColumn: '1 / -1', padding: '12px', background: 'rgba(231, 76, 60, 0.1)', border: '1px solid #e74c3c', borderRadius: 6 }}>
               <div style={{ color: '#e74c3c', fontWeight: 600, marginBottom: 8, fontSize: 13 }}>⚠️ 检测到冲突：</div>
+              {conflictInfo.locationConflicts && conflictInfo.locationConflicts.length > 0 && (
+                <div style={{ color: '#e0e0e0', fontSize: 13, marginBottom: 6 }}>
+                  📍 地点占用（{conflictInfo.locationConflicts.length}个）：
+                  {conflictInfo.locationConflicts.map((r) => `「${r.title}」(${formatDate(r.startTime)})`).join('、')}
+                </div>
+              )}
               {conflictInfo.timeConflicts.length > 0 && (
                 <div style={{ color: '#e0e0e0', fontSize: 13, marginBottom: 6 }}>
                   📅 时间冲突（{conflictInfo.timeConflicts.length}个）：
@@ -597,13 +635,13 @@ export default function CalendarPage() {
                   ))}
                 </div>
               )}
-              <div style={{ color: '#888', fontSize: 12, marginTop: 8 }}>提示：您仍可提交，但可能会造成日程冲突。</div>
+              <div style={{ color: '#888', fontSize: 12, marginTop: 8 }}>提示：地点冲突将阻止提交，其他冲突仅为提醒。</div>
             </div>
           )}
 
           {!checkingConflict && conflictInfo && !conflictInfo.hasConflict && form.startTime && form.endTime && (
             <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(46, 204, 113, 0.1)', border: '1px solid #2ecc71', borderRadius: 6, color: '#2ecc71', fontSize: 13 }}>
-              ✅ 无时间冲突，参与人都空闲
+              ✅ 无时间冲突，参与人都空闲{form.location && '，地点可用'}
             </div>
           )}
 
@@ -862,12 +900,17 @@ export default function CalendarPage() {
                   </div>
                 )}
 
+                {r.hasConflict && r.locationConflicts && r.locationConflicts.length > 0 && (
+                  <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 8, padding: '6px 10px', background: 'rgba(231, 76, 60, 0.08)', borderRadius: 4 }}>
+                    📍 地点占用冲突：与 {r.locationConflicts.map((x) => `「${x.title}」(${formatDate(x.startTime)})`).join('、')} 冲突
+                  </div>
+                )}
                 {r.hasConflict && r.participantConflicts && r.participantConflicts.length > 0 && (
                   <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 8, padding: '6px 10px', background: 'rgba(231, 76, 60, 0.08)', borderRadius: 4 }}>
                     冲突详情：{r.participantConflicts.map((p) => `${p.userName || '用户#' + p.userId}在${p.conflictingRehearsals.map((x) => x.title).join('、')}有安排`).join('；')}
                   </div>
                 )}
-                {r.hasConflict && r.timeConflicts && r.timeConflicts.length > 0 && (!r.participantConflicts || r.participantConflicts.length === 0) && (
+                {r.hasConflict && r.timeConflicts && r.timeConflicts.length > 0 && (!r.participantConflicts || r.participantConflicts.length === 0) && (!r.locationConflicts || r.locationConflicts.length === 0) && (
                   <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 8, padding: '6px 10px', background: 'rgba(231, 76, 60, 0.08)', borderRadius: 4 }}>
                     时间与其他排练冲突：{r.timeConflicts.map((x) => x.title).join('、')}
                   </div>
