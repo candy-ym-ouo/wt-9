@@ -124,12 +124,71 @@ export default function SearchPage() {
           {results.roles.length > 0 && (
             <section style={{ marginBottom: 24 }}>
               <h3 style={{ color: '#9b59b6', fontSize: 15, marginBottom: 12 }}>🎭 角色 ({results.roles.length})</h3>
-              {results.roles.map((r: any) => (
-                <div key={r.id} style={cardStyle}>
-                  <strong style={{ color: '#e0e0e0' }}>{r.characterName}</strong>
-                  {r.characterDescription && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{r.characterDescription}</div>}
-                </div>
-              ))}
+              {results.roles.map((r: any) => {
+                const statusInfo = (() => {
+                  if (!r.actorId) return { text: '未分配演员', color: '#888', bg: 'rgba(136,136,136,0.1)' };
+                  if (r.actorOnLeave) {
+                    if (r.currentSubstitute) return { text: '请假中（有替补）', color: '#e67e22', bg: 'rgba(230,126,34,0.1)' };
+                    return { text: '请假中（无替补）', color: '#e74c3c', bg: 'rgba(231,76,60,0.1)' };
+                  }
+                  return { text: '正常', color: '#2ecc71', bg: 'rgba(46,204,113,0.1)' };
+                })();
+                return (
+                  <div key={r.id} style={cardStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <strong style={{ color: '#e0e0e0' }}>{r.characterName}</strong>
+                      <span style={{
+                        padding: '2px 8px',
+                        background: statusInfo.bg,
+                        border: `1px solid ${statusInfo.color}`,
+                        color: statusInfo.color,
+                        borderRadius: 10,
+                        fontSize: 11,
+                      }}>
+                        {statusInfo.text}
+                      </span>
+                    </div>
+                    {r.characterDescription && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{r.characterDescription}</div>}
+                    {r.actorName && (
+                      <div style={{ fontSize: 13, color: '#aaa', marginTop: 6 }}>
+                        扮演者: <strong style={{ color: '#e0e0e0' }}>{r.actorName}</strong>
+                      </div>
+                    )}
+                    {r.substituteActors && r.substituteActors.length > 0 && (
+                      <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+                        替补: {r.substituteActors.map((s: any) => (
+                          <span key={s.id} style={{
+                            padding: '2px 6px',
+                            background: s.isOnLeave ? 'rgba(231,76,60,0.1)' : 'rgba(46,204,113,0.1)',
+                            border: `1px solid ${s.isOnLeave ? '#e74c3c' : '#2ecc71'}`,
+                            color: s.isOnLeave ? '#e74c3c' : '#2ecc71',
+                            borderRadius: 8,
+                            fontSize: 11,
+                            marginRight: 4,
+                          }}>
+                            {s.displayName || s.username}{s.isOnLeave ? '(请假)' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {r.activeLeave && (
+                      <div style={{
+                        marginTop: 8,
+                        padding: '6px 10px',
+                        background: 'rgba(230,126,34,0.08)',
+                        border: '1px solid rgba(230,126,34,0.3)',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        color: '#e67e22',
+                      }}>
+                        请假中 · {r.activeLeave.type === 'sick' ? '病假' : r.activeLeave.type === 'personal' ? '事假' : '其他'}
+                        {r.activeLeave.reason && ` · ${r.activeLeave.reason}`}
+                        {r.currentSubstitute && ` → 替补: ${r.currentSubstitute.displayName || r.currentSubstitute.username}`}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </section>
           )}
 

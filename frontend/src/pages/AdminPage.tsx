@@ -20,10 +20,15 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', role: 'actor', displayName: '' });
+  const [leaveStats, setLeaveStats] = useState<any>(null);
 
   const load = async () => {
-    const data = await api.users.list();
-    setUsers(data);
+    const [usersData, statsData] = await Promise.all([
+      api.users.list(),
+      api.leaves.statistics(),
+    ]);
+    setUsers(usersData);
+    setLeaveStats(statsData);
   };
 
   useEffect(() => { load(); }, []);
@@ -108,6 +113,54 @@ export default function AdminPage() {
         </table>
       </div>
       {users.length === 0 && <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>暂无用户</div>}
+
+      {leaveStats && (
+        <div style={{ marginTop: 32 }}>
+          <h3 style={{ margin: '0 0 16px', color: '#e0e0e0', fontSize: 16 }}>请假统计</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#e74c3c' }}>{leaveStats.total}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>总请假数</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#f39c12' }}>{leaveStats.pending}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>待审批</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#2ecc71' }}>{leaveStats.approved}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>已批准</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#e74c3c' }}>{leaveStats.rejected}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>已拒绝</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#9b59b6' }}>{leaveStats.activeLeaves}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>进行中</div>
+            </div>
+            <div style={statCardStyle}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#e67e22' }}>{leaveStats.activeActorsOnLeave}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>当前请假人数</div>
+            </div>
+          </div>
+          {leaveStats.byType && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
+              <div style={statCardStyle}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: '#3498db' }}>{leaveStats.byType.sick}</div>
+                <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>病假</div>
+              </div>
+              <div style={statCardStyle}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: '#1abc9c' }}>{leaveStats.byType.personal}</div>
+                <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>事假</div>
+              </div>
+              <div style={statCardStyle}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: '#95a5a6' }}>{leaveStats.byType.other}</div>
+                <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>其他</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -163,4 +216,12 @@ const tdStyle: React.CSSProperties = {
   padding: '10px 16px',
   color: '#e0e0e0',
   fontSize: 14,
+};
+
+const statCardStyle: React.CSSProperties = {
+  background: '#1a1a1a',
+  borderRadius: 8,
+  border: '1px solid #333',
+  padding: 16,
+  textAlign: 'center',
 };
