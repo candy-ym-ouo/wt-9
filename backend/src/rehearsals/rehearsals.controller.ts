@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Request, HttpException, HttpStatus } from '@nestjs/common';
 import { RehearsalsService } from './rehearsals.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,11 +11,14 @@ export class RehearsalsController {
   constructor(private service: RehearsalsService) {}
 
   @Get()
-  findAll(@Query('start') start?: string, @Query('end') end?: string) {
+  async findAll(@Query('start') start?: string, @Query('end') end?: string) {
+    let rehearsals: Rehearsal[];
     if (start && end) {
-      return this.service.findByDateRange(start, end);
+      rehearsals = await this.service.findByDateRange(start, end);
+    } else {
+      rehearsals = await this.service.findAll();
     }
-    return this.service.findAll();
+    return this.service.enrichWithConflictInfo(rehearsals);
   }
 
   @Get(':id')
@@ -23,10 +26,30 @@ export class RehearsalsController {
     return this.service.findOne(id);
   }
 
+  @Post('check-conflicts')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  checkConflicts(
+    @Body()
+    body: {
+      startTime: string;
+      endTime: string;
+      participantIds?: number[];
+      excludeId?: number;
+    },
+  ) {
+    return this.service.checkConflicts(
+      new Date(body.startTime),
+      new Date(body.endTime),
+      body.participantIds || [],
+      body.excludeId,
+    );
+  }
+
   @Post()
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  create(
+  async create(
     @Body()
     body: {
       title: string;
@@ -38,20 +61,42 @@ export class RehearsalsController {
     },
     @Request() req: any,
   ) {
-    return this.service.create({
-      ...body,
-      startTime: new Date(body.startTime),
-      endTime: new Date(body.endTime),
-      createdBy: req.user.userId,
-      participantIds: body.participantIds || [],
-    });
+    try {
+      return await this.service.create({
+        ...body,
+        startTime: new Date(body.startTime),
+        endTime: new Date(body.endTime),
+        createdBy: req.user.userId,
+        participantIds: body.participantIds || [],
+      });
+    } catch (e: any) {
+      throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   @Put(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  update(@Param('id') id: number, @Body() body: Partial<Rehearsal>) {
-    return this.service.update(id, body);
+  async update(
+    @Param('id') id: number,
+    @Body()
+    body: Partial<{
+      title: string;
+      description: string;
+      startTime: string;
+      endTime: string;
+      location: string;
+      participantIds: number[];
+    }>,
+  ) {
+    try {
+      const data: any = { ...body };
+      if (body.startTime) data.startTime = new Date(body.startTime);
+      if (body.endTime) data.endTime = new Date(body.endTime);
+      return await this.service.update(id, data);
+    } catch (e: any) {
+      throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   @Delete(':id')

@@ -26,6 +26,7 @@ async function seedDefaults(app: any) {
 
 async function bootstrap() {
   const uploadDir = join(process.cwd(), 'uploads');
+  const port = Number(process.env.PORT || 3000);
   if (!existsSync(uploadDir)) {
     mkdirSync(uploadDir, { recursive: true });
     console.log('📁 uploads 目录已创建');
@@ -37,7 +38,7 @@ async function bootstrap() {
 
   await seedDefaults(app);
 
-  await app.listen(3000);
-  console.log('🎭 实验戏剧排练档案系统后端已启动: http://localhost:3000');
+  await app.listen(port);
+  console.log(`🎭 实验戏剧排练档案系统后端已启动: http://localhost:${port}`);
 }
 bootstrap();

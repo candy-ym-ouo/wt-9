@@ -13,8 +13,9 @@ import { SearchModule } from './search/search.module';
 @Module({
   imports: [
     TypeOrmModule.forRoot({
-      type: 'better-sqlite3',
-      database: join(process.cwd(), 'theater.db'),
+      type: 'sqljs',
+      location: join(process.cwd(), 'theater.db'),
+      autoSave: true,
       entities: [User, Rehearsal, CastRole, Annotation, Material],
       synchronize: true,
     }),

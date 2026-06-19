@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { Rehearsal, CastRole, Annotation, Material } from '../entities';
+import { RehearsalsService } from '../rehearsals/rehearsals.service';
 
 @Injectable()
 export class SearchService {
@@ -14,6 +15,7 @@ export class SearchService {
     private annotationRepo: Repository<Annotation>,
     @InjectRepository(Material)
     private materialRepo: Repository<Material>,
+    private rehearsalsService: RehearsalsService,
   ) {}
 
   async search(query: string) {
@@ -48,8 +50,10 @@ export class SearchService {
       }),
     ]);
 
+    const rehearsalsWithConflicts = await this.rehearsalsService.enrichWithConflictInfo(rehearsals);
+
     return {
-      rehearsals,
+      rehearsals: rehearsalsWithConflicts,
       roles,
       annotations,
       materials,

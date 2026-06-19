@@ -4,8 +4,9 @@ import { join } from 'path';
 
 async function seed() {
   const dataSource = new DataSource({
-    type: 'better-sqlite3',
-    database: join(process.cwd(), 'theater.db'),
+    type: 'sqljs',
+    location: join(process.cwd(), 'theater.db'),
+    autoSave: true,
     entities: [User],
     synchronize: true,
   });

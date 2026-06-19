@@ -26,6 +26,8 @@ export default function SearchPage() {
     }
   };
 
+  const formatDate = (d: string) => new Date(d).toLocaleString('zh-CN');
+
   return (
     <div>
       <h2 style={{ margin: '0 0 24px', color: '#e0e0e0' }}>全站检索</h2>
@@ -74,13 +76,46 @@ export default function SearchPage() {
             <section style={{ marginBottom: 24 }}>
               <h3 style={{ color: '#e67e22', fontSize: 15, marginBottom: 12 }}>📅 排练 ({results.rehearsals.length})</h3>
               {results.rehearsals.map((r: any) => (
-                <div key={r.id} style={cardStyle}>
-                  <strong style={{ color: '#e0e0e0' }}>{r.title}</strong>
+                <div key={r.id} style={{ ...cardStyle, borderLeft: r.hasConflict ? '4px solid #e74c3c' : undefined }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <strong style={{ color: '#e0e0e0' }}>{r.title}</strong>
+                    {r.hasConflict && (
+                      <span style={{
+                        padding: '2px 8px',
+                        background: 'rgba(231, 76, 60, 0.2)',
+                        border: '1px solid #e74c3c',
+                        color: '#e74c3c',
+                        borderRadius: 10,
+                        fontSize: 11,
+                      }}>
+                        ⚠️ 冲突
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                    {new Date(r.startTime).toLocaleString('zh-CN')}
+                    {formatDate(r.startTime)}
                     {r.location && ` · 📍 ${r.location}`}
                   </div>
                   {r.description && <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{r.description}</div>}
+                  {r.hasConflict && (
+                    <div style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      background: 'rgba(231, 76, 60, 0.08)',
+                      borderRadius: 4,
+                      fontSize: 12,
+                      color: '#e74c3c',
+                    }}>
+                      {r.timeConflicts && r.timeConflicts.length > 0 && (
+                        <div>📅 时间冲突：{r.timeConflicts.map((x: any) => x.title).join('、')}</div>
+                      )}
+                      {r.participantConflicts && r.participantConflicts.length > 0 && (
+                        <div style={{ marginTop: 4 }}>
+                          👥 参与人占用：{r.participantConflicts.map((p: any) => `${p.userName || '用户#' + p.userId}在${p.conflictingRehearsals.map((x: any) => x.title).join('、')}有安排`).join('；')}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </section>
