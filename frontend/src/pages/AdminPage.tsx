@@ -6,6 +6,19 @@ interface User {
   username: string;
   role: string;
   displayName: string;
+  status: string;
+  frozenAt: string | null;
+  createdAt: string;
+}
+
+interface AuditLogEntry {
+  id: number;
+  action: string;
+  operatorId: number;
+  operatorName: string;
+  targetUserId: number;
+  targetUsername: string;
+  detail: string;
   createdAt: string;
 }
 
@@ -35,6 +48,7 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', role: 'actor', displayName: '' });
   const [leaveStats, setLeaveStats] = useState<any>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -43,12 +57,14 @@ export default function AdminPage() {
   });
 
   const load = async () => {
-    const [usersData, statsData] = await Promise.all([
+    const [usersData, statsData, logsData] = await Promise.all([
       api.users.list(),
       api.leaves.statistics(),
+      api.auditLogs.list({ limit: 50 }),
     ]);
     setUsers(usersData);
     setLeaveStats(statsData);
+    setAuditLogs(logsData);
   };
 
   const loadMaterials = async () => {
@@ -73,6 +89,16 @@ export default function AdminPage() {
 
   const handleDeleteUser = async (id: number) => {
     await api.users.remove(id);
+    load();
+  };
+
+  const handleFreeze = async (id: number) => {
+    await api.users.freeze(id);
+    load();
+  };
+
+  const handleUnfreeze = async (id: number) => {
+    await api.users.unfreeze(id);
     load();
   };
 
@@ -150,12 +176,13 @@ export default function AdminPage() {
               <th style={thStyle}>用户名</th>
               <th style={thStyle}>显示名</th>
               <th style={thStyle}>角色</th>
+              <th style={thStyle}>状态</th>
               <th style={thStyle}>操作</th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} style={{ borderBottom: '1px solid #222' }}>
+              <tr key={u.id} style={{ borderBottom: '1px solid #222', opacity: u.status === 'frozen' ? 0.5 : 1 }}>
                 <td style={tdStyle}>{u.id}</td>
                 <td style={tdStyle}>{u.username}</td>
                 <td style={tdStyle}>{u.displayName || '-'}</td>
@@ -169,7 +196,22 @@ export default function AdminPage() {
                   </select>
                 </td>
                 <td style={tdStyle}>
-                  <button onClick={() => handleDeleteUser(u.id)} style={deleteBtnStyle}>删除</button>
+                  <span style={{
+                    ...statusChipStyle,
+                    background: u.status === 'frozen' ? '#e74c3c' : '#2ecc71',
+                  }}>
+                    {u.status === 'frozen' ? '已冻结' : '正常'}
+                  </span>
+                </td>
+                <td style={tdStyle}>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {u.status === 'frozen' ? (
+                      <button onClick={() => handleUnfreeze(u.id)} style={unfreezeBtnStyle}>解冻</button>
+                    ) : (
+                      <button onClick={() => handleFreeze(u.id)} style={freezeBtnStyle}>冻结</button>
+                    )}
+                    <button onClick={() => handleDeleteUser(u.id)} style={deleteBtnStyle}>删除</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -177,6 +219,45 @@ export default function AdminPage() {
         </table>
       </div>
       {users.length === 0 && <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>暂无用户</div>}
+
+      {auditLogs.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <h3 style={{ margin: '0 0 16px', color: '#e0e0e0', fontSize: 16 }}>操作日志</h3>
+          <div style={{ background: '#1a1a1a', borderRadius: 8, border: '1px solid #333', overflow: 'auto', maxHeight: 300 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <th style={thStyle}>时间</th>
+                  <th style={thStyle}>操作人</th>
+                  <th style={thStyle}>操作</th>
+                  <th style={thStyle}>目标用户</th>
+                  <th style={thStyle}>详情</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLogs.map((log) => (
+                  <tr key={log.id} style={{ borderBottom: '1px solid #222' }}>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', fontSize: 12 }}>
+                      {new Date(log.createdAt).toLocaleString('zh-CN')}
+                    </td>
+                    <td style={tdStyle}>{log.operatorName || `用户#${log.operatorId}`}</td>
+                    <td style={tdStyle}>
+                      <span style={{
+                        ...actionChipStyle,
+                        background: log.action.includes('freeze') ? '#e74c3c' : '#3498db',
+                      }}>
+                        {log.action === 'freeze_user' ? '冻结' : log.action === 'unfreeze_user' ? '解冻' : log.action}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>{log.targetUsername || `用户#${log.targetUserId}`}</td>
+                    <td style={tdStyle}>{log.detail || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {leaveStats && (
         <div style={{ marginTop: 32 }}>
@@ -445,4 +526,39 @@ const labelTagStyle: React.CSSProperties = {
   background: '#1a2a3a',
   color: '#3498db',
   border: '1px solid #2a3a5a',
+};
+
+const statusChipStyle: React.CSSProperties = {
+  padding: '2px 8px',
+  borderRadius: 10,
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+const freezeBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #f39c12',
+  color: '#f39c12',
+  padding: '4px 10px',
+  borderRadius: 4,
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const unfreezeBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #2ecc71',
+  color: '#2ecc71',
+  padding: '4px 10px',
+  borderRadius: 4,
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const actionChipStyle: React.CSSProperties = {
+  padding: '2px 6px',
+  borderRadius: 4,
+  color: '#fff',
+  fontSize: 11,
 };

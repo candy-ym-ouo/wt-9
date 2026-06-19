@@ -1,4 +1,4 @@
-export { User, UserRole } from './user.entity';
+export { User, UserRole, UserStatus } from './user.entity';
 export { Rehearsal } from './rehearsal.entity';
 export { CastRole } from './role.entity';
 export { Annotation } from './annotation.entity';
@@ -7,3 +7,4 @@ export { Material } from './material.entity';
 export { LeaveRequest, LeaveStatus, LeaveType } from './leave.entity';
 export { ReminderConfig, ReminderType, ReminderChannel } from './reminder-config.entity';
 export { Reminder, ReminderStatus } from './reminder.entity';
+export { AuditLog, AuditAction } from './audit-log.entity';

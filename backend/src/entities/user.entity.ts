@@ -7,6 +7,11 @@ export enum UserRole {
   VIEWER = 'viewer',
 }
 
+export enum UserStatus {
+  ACTIVE = 'active',
+  FROZEN = 'frozen',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn()
@@ -23,6 +28,12 @@ export class User {
 
   @Column({ nullable: true })
   displayName: string;
+
+  @Column({ type: 'simple-enum', enum: UserStatus, default: UserStatus.ACTIVE })
+  status: UserStatus;
+
+  @Column({ type: 'datetime', nullable: true })
+  frozenAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

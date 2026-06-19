@@ -6,12 +6,13 @@ interface User {
   username: string;
   role: string;
   displayName?: string;
+  status?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<{ success: boolean; frozen?: boolean; message?: string }>;
   logout: () => void;
   isAdmin: boolean;
   isDirector: boolean;
@@ -20,7 +21,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
-  login: async () => false,
+  login: async () => ({ success: false }),
   logout: () => {},
   isAdmin: false,
   isDirector: false,
@@ -32,22 +33,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (token) {
-      api.auth.profile().then((u) => setUser(u)).catch(() => {
+      api.auth.profile().then((u) => {
+        if (u.status === 'frozen') {
+          localStorage.removeItem('token');
+          setToken(null);
+          setUser(null);
+        } else {
+          setUser(u);
+        }
+      }).catch(() => {
         localStorage.removeItem('token');
         setToken(null);
       });
     }
   }, [token]);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<{ success: boolean; frozen?: boolean; message?: string }> => {
     const res = await api.auth.login(username, password);
     if (res.success) {
       localStorage.setItem('token', res.accessToken);
       setToken(res.accessToken);
       setUser(res.user);
-      return true;
+      return { success: true };
     }
-    return false;
+    if (res.frozen) {
+      return { success: false, frozen: true, message: res.message || '该账号已被冻结，请联系管理员' };
+    }
+    return { success: false, message: res.message || '用户名或密码错误' };
   };
 
   const logout = () => {

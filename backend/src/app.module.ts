@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
-import { User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig } from './entities';
+import { User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig, AuditLog } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RehearsalsModule } from './rehearsals/rehearsals.module';
@@ -11,6 +11,7 @@ import { MaterialsModule } from './materials/materials.module';
 import { SearchModule } from './search/search.module';
 import { LeavesModule } from './leaves/leaves.module';
 import { RemindersModule } from './reminders/reminders.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { RemindersModule } from './reminders/reminders.module';
       type: 'sqljs',
       location: join(process.cwd(), 'theater.db'),
       autoSave: true,
-      entities: [User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig],
+      entities: [User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig, AuditLog],
       synchronize: true,
     }),
     AuthModule,
@@ -30,6 +31,7 @@ import { RemindersModule } from './reminders/reminders.module';
     SearchModule,
     LeavesModule,
     RemindersModule,
+    AuditLogsModule,
   ],
 })
 export class AppModule {}

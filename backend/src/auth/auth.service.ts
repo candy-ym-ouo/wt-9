@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User, UserRole } from '../entities';
+import { User, UserRole, UserStatus } from '../entities';
 
 @Injectable()
 export class AuthService {
@@ -25,10 +25,14 @@ export class AuthService {
     if (!user) {
       return null;
     }
+    if (user.status === UserStatus.FROZEN) {
+      return { success: false, frozen: true, message: '该账号已被冻结，请联系管理员' };
+    }
     const payload = { sub: user.id, username: user.username, role: user.role };
     return {
+      success: true,
       accessToken: this.jwtService.sign(payload),
-      user: { id: user.id, username: user.username, role: user.role, displayName: user.displayName },
+      user: { id: user.id, username: user.username, role: user.role, displayName: user.displayName, status: user.status },
     };
   }
 

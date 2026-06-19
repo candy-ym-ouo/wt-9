@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -25,6 +25,20 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   updateRole(@Param('id') id: number, @Body() body: { role: UserRole }) {
     return this.usersService.updateRole(id, body.role);
+  }
+
+  @Put(':id/freeze')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  freeze(@Param('id') id: number, @Request() req: any) {
+    return this.usersService.freeze(id, req.user.userId, req.user.username);
+  }
+
+  @Put(':id/unfreeze')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  unfreeze(@Param('id') id: number, @Request() req: any) {
+    return this.usersService.unfreeze(id, req.user.userId, req.user.username);
   }
 
   @Delete(':id')

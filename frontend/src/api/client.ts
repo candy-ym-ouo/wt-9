@@ -60,7 +60,22 @@ export const api = {
     list: () => request<any[]>('/users'),
     updateRole: (id: number, role: string) =>
       request<any>(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+    freeze: (id: number) =>
+      request<any>(`/users/${id}/freeze`, { method: 'PUT' }),
+    unfreeze: (id: number) =>
+      request<any>(`/users/${id}/unfreeze`, { method: 'PUT' }),
     remove: (id: number) => request<any>(`/users/${id}`, { method: 'DELETE' }),
+  },
+  auditLogs: {
+    list: (params?: { targetUserId?: number; action?: string; limit?: number; offset?: number }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.targetUserId) searchParams.set('targetUserId', String(params.targetUserId));
+      if (params?.action) searchParams.set('action', params.action);
+      if (params?.limit) searchParams.set('limit', String(params.limit));
+      if (params?.offset) searchParams.set('offset', String(params.offset));
+      const q = searchParams.toString();
+      return request<any[]>(`/audit-logs${q ? '?' + q : ''}`);
+    },
   },
   rehearsals: {
     list: (params?: {

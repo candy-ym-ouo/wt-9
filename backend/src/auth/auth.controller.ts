@@ -13,7 +13,10 @@ export class AuthController {
     if (!result) {
       return { success: false, message: '用户名或密码错误' };
     }
-    return { success: true, ...result };
+    if (result.frozen) {
+      return { success: false, frozen: true, message: result.message };
+    }
+    return result;
   }
 
   @Post('register')

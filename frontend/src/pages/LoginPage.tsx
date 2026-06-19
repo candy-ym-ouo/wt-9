@@ -12,11 +12,13 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const ok = await login(username, password);
-    if (ok) {
+    const result = await login(username, password);
+    if (result.success) {
       navigate('/calendar');
+    } else if (result.frozen) {
+      setError(result.message || '该账号已被冻结，请联系管理员');
     } else {
-      setError('用户名或密码错误');
+      setError(result.message || '用户名或密码错误');
     }
   };
 
