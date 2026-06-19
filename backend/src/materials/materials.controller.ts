@@ -20,8 +20,13 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../entities';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
+
+if (!existsSync(UPLOAD_DIR)) {
+  mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 @Controller('materials')
 @UseGuards(JwtAuthGuard)
@@ -36,6 +41,19 @@ export class MaterialsController {
     return this.service.findAll();
   }
 
+  @Get(':id/download')
+  async download(@Param('id') id: number, @Res() res: Response) {
+    const material = await this.service.findOne(id);
+    if (!material) {
+      return res.status(404).json({ message: '文件不存在' });
+    }
+    const filePath = join(UPLOAD_DIR, material.storedName);
+    if (!existsSync(filePath)) {
+      return res.status(404).json({ message: '文件已被删除' });
+    }
+    return res.download(filePath, material.originalName);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: number) {
     return this.service.findOne(id);
@@ -45,7 +63,12 @@ export class MaterialsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: UPLOAD_DIR,
+        destination: (_req, _file, cb) => {
+          if (!existsSync(UPLOAD_DIR)) {
+            mkdirSync(UPLOAD_DIR, { recursive: true });
+          }
+          cb(null, UPLOAD_DIR);
+        },
         filename: (_req, file, cb) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
           cb(null, uniqueSuffix + extname(file.originalname));
@@ -68,16 +91,6 @@ export class MaterialsController {
       description: description || '',
       createdBy: req.user.userId,
     });
-  }
-
-  @Get(':id/download')
-  async download(@Param('id') id: number, @Res() res: Response) {
-    const material = await this.service.findOne(id);
-    if (!material) {
-      return res.status(404).json({ message: '文件不存在' });
-    }
-    const filePath = join(UPLOAD_DIR, material.storedName);
-    return res.download(filePath, material.originalName);
   }
 
   @Delete(':id')

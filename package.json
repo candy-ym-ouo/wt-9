@@ -9,6 +9,6 @@
     "dev:backend": "cd backend && npm run start:dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "cd backend && npm run build && cd ../frontend && npm run build",
-    "seed": "cd backend && npx ts-node src/seed.ts"
+    "start": "cd backend && node dist/main.js"
   }
 }

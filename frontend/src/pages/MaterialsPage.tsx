@@ -56,6 +56,14 @@ export default function MaterialsPage() {
     return '📎';
   };
 
+  const handleDownload = async (id: number) => {
+    try {
+      await api.materials.download(id);
+    } catch (e) {
+      alert('下载失败: ' + (e as Error).message);
+    }
+  };
+
   const categories = ['general', 'script', 'music', 'costume', 'set', 'prop', 'video', 'photo'];
 
   return (
@@ -114,12 +122,12 @@ export default function MaterialsPage() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <a
-                href={api.materials.downloadUrl(m.id)}
-                style={{ fontSize: 12, color: '#3498db', textDecoration: 'none' }}
+              <button
+                onClick={() => handleDownload(m.id)}
+                style={{ background: 'none', border: 'none', color: '#3498db', cursor: 'pointer', fontSize: 12, padding: 0 }}
               >
                 下载
-              </a>
+              </button>
               {isDirector && (
                 <button onClick={() => handleDelete(m.id)} style={deleteBtnStyle}>删除</button>
               )}

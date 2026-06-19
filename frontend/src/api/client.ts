@@ -28,6 +28,26 @@ async function uploadFile(path: string, file: File, params?: Record<string, stri
   return res.json();
 }
 
+async function downloadFile(id: number) {
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${BASE}/materials/${id}/download`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const blob = await res.blob();
+  const contentDisposition = res.headers.get('content-disposition') || '';
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?["']?([^;"'\n]+)/i);
+  const filename = match ? decodeURIComponent(match[1]) : `material-${id}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   auth: {
     login: (username: string, password: string) =>
@@ -87,7 +107,7 @@ export const api = {
     upload: (file: File, category?: string, description?: string) =>
       uploadFile('/materials/upload', file, { category: category || 'general', description: description || '' }),
     remove: (id: number) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
-    downloadUrl: (id: number) => `${BASE}/materials/${id}/download`,
+    download: (id: number) => downloadFile(id),
   },
   search: {
     query: (q: string) => request<any>(`/search?q=${encodeURIComponent(q)}`),
