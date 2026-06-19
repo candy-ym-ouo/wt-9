@@ -45,9 +45,14 @@ const ROLE_LABELS: Record<string, string> = { admin: '管理员', director: '导
 export default function MaterialsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [filterCats, setFilterCats] = useState<string[]>([]);
-  const [filterTags, setFilterTags] = useState<string[]>([]);
-  const [keyword, setKeyword] = useState('');
+
+  const urlCats = searchParams.get('categories');
+  const urlTags = searchParams.get('tags');
+  const urlQ = searchParams.get('q') || '';
+
+  const [filterCats, setFilterCats] = useState<string[]>(urlCats ? urlCats.split(',') : []);
+  const [filterTags, setFilterTags] = useState<string[]>(urlTags ? urlTags.split(',') : []);
+  const [keyword, setKeyword] = useState(urlQ);
   const [availableCategories, setAvailableCategories] = useState<string[]>(PRESET_CATEGORIES);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
@@ -91,18 +96,54 @@ export default function MaterialsPage() {
   useEffect(() => { loadMeta(); }, []);
   useEffect(() => { load(); }, [filterCats, filterTags, keyword]);
 
+  const syncUrlParams = () => {
+    const params = new URLSearchParams(searchParams);
+    if (keyword.trim()) {
+      params.set('q', keyword.trim());
+    } else {
+      params.delete('q');
+    }
+    if (filterCats.length > 0) {
+      params.set('categories', filterCats.join(','));
+    } else {
+      params.delete('categories');
+    }
+    if (filterTags.length > 0) {
+      params.set('tags', filterTags.join(','));
+    } else {
+      params.delete('tags');
+    }
+    setSearchParams(params, { replace: true });
+  };
+
+  useEffect(() => {
+    syncUrlParams();
+  }, [keyword, filterCats, filterTags]);
+
   useEffect(() => {
     const materialIdParam = searchParams.get('materialId');
     const qParam = searchParams.get('q');
-    if (qParam && !keyword) {
+    const catsParam = searchParams.get('categories');
+    const tagsParam = searchParams.get('tags');
+
+    if (qParam && qParam !== keyword) {
       setKeyword(qParam);
     }
+    if (catsParam && catsParam !== filterCats.join(',')) {
+      setFilterCats(catsParam.split(','));
+    }
+    if (tagsParam && tagsParam !== filterTags.join(',')) {
+      setFilterTags(tagsParam.split(','));
+    }
+
     if (materialIdParam && materials.length > 0) {
       const id = Number(materialIdParam);
       const exists = materials.some((m) => m.id === id);
       if (exists) {
         handleViewDetail(id);
-        setSearchParams({}, { replace: true });
+        const params = new URLSearchParams(searchParams);
+        params.delete('materialId');
+        setSearchParams(params, { replace: true });
       }
     }
   }, [searchParams, materials]);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 
 interface SearchResult {
@@ -78,21 +78,35 @@ function highlightSearchResult(
 
 export default function SearchPage() {
   const navigate = useNavigate();
-  const [query, setQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [allTags, setAllTags] = useState<string[]>([]);
 
-  const [selectedModules, setSelectedModules] = useState<string[]>(['rehearsals', 'roles', 'annotations', 'materials']);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [dateField, setDateField] = useState('createdAt');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState('relevance');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [groupByModule, setGroupByModule] = useState(true);
-  const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped');
+  const urlModules = searchParams.get('modules');
+  const urlQ = searchParams.get('q') || '';
+  const urlDateFrom = searchParams.get('dateFrom') || '';
+  const urlDateTo = searchParams.get('dateTo') || '';
+  const urlDateField = searchParams.get('dateField') || 'createdAt';
+  const urlTags = searchParams.get('tags');
+  const urlSortBy = searchParams.get('sortBy') || 'relevance';
+  const urlSortOrder = searchParams.get('sortOrder') || 'desc';
+  const urlGroupBy = searchParams.get('groupBy');
+  const urlViewMode = searchParams.get('viewMode') || 'grouped';
+
+  const [query, setQuery] = useState(urlQ);
+  const [selectedModules, setSelectedModules] = useState<string[]>(
+    urlModules ? urlModules.split(',') : ['rehearsals', 'roles', 'annotations', 'materials']
+  );
+  const [dateFrom, setDateFrom] = useState(urlDateFrom);
+  const [dateTo, setDateTo] = useState(urlDateTo);
+  const [dateField, setDateField] = useState(urlDateField);
+  const [selectedTags, setSelectedTags] = useState<string[]>(urlTags ? urlTags.split(',') : []);
+  const [sortBy, setSortBy] = useState(urlSortBy);
+  const [sortOrder, setSortOrder] = useState(urlSortOrder);
+  const [groupByModule, setGroupByModule] = useState(urlGroupBy !== 'false');
+  const [viewMode, setViewMode] = useState<'grouped' | 'list'>(urlViewMode as 'grouped' | 'list');
 
   useEffect(() => {
     api.search.getTags().then(setAllTags).catch(() => {});
@@ -109,6 +123,21 @@ export default function SearchPage() {
     );
   }, [selectedModules, dateFrom, dateTo, selectedTags, sortBy, sortOrder]);
 
+  const syncUrlParams = () => {
+    const params: Record<string, string> = {};
+    if (query.trim()) params.q = query.trim();
+    if (selectedModules.length < 4) params.modules = selectedModules.join(',');
+    if (dateFrom) params.dateFrom = dateFrom;
+    if (dateTo) params.dateTo = dateTo;
+    if (dateField !== 'createdAt') params.dateField = dateField;
+    if (selectedTags.length > 0) params.tags = selectedTags.join(',');
+    if (sortBy !== 'relevance') params.sortBy = sortBy;
+    if (sortOrder !== 'desc') params.sortOrder = sortOrder;
+    if (!groupByModule) params.groupBy = 'false';
+    if (viewMode !== 'grouped') params.viewMode = viewMode;
+    setSearchParams(params, { replace: false });
+  };
+
   const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
     doSearch();
@@ -119,6 +148,7 @@ export default function SearchPage() {
       setResults(null);
       return;
     }
+    syncUrlParams();
     setLoading(true);
     try {
       const data = await api.search.advanced({
@@ -142,7 +172,13 @@ export default function SearchPage() {
     if (results || query.trim() || hasActiveFilters) {
       doSearch();
     }
-  }, [sortBy, sortOrder, groupByModule]);
+  }, [sortBy, sortOrder, groupByModule, viewMode]);
+
+  useEffect(() => {
+    if ((urlQ || urlModules || urlDateFrom || urlDateTo || urlTags) && !results && !loading) {
+      doSearch();
+    }
+  }, []);
 
   const toggleModule = (key: string) => {
     setSelectedModules((prev) =>
@@ -164,6 +200,7 @@ export default function SearchPage() {
     setSelectedTags([]);
     setSortBy('relevance');
     setSortOrder('desc');
+    setQuery('');
   };
 
   const formatDate = (d: string | Date) => new Date(d).toLocaleString('zh-CN');

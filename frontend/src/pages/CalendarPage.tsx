@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -117,6 +117,7 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [showFilters, setShowFilters] = useState(false);
+  const [keyword, setKeyword] = useState(searchParams.get('q') || '');
   const [expandedRehearsalId, setExpandedRehearsalId] = useState<number | null>(null);
   const [attendanceEdits, setAttendanceEdits] = useState<Record<number, { status: 'present' | 'absent' | 'late' | null; absentReason?: string }>>({});
   const [savingAttendance, setSavingAttendance] = useState(false);
@@ -137,10 +138,36 @@ export default function CalendarPage() {
   };
 
   const hasActiveFilters =
-    filters.location || filters.participantId || (filters.timeSlotStart && filters.timeSlotEnd) || filters.attendanceStatus;
+    filters.location || filters.participantId || (filters.timeSlotStart && filters.timeSlotEnd) || filters.attendanceStatus || keyword;
+
+  const filteredRehearsals = useMemo(() => {
+    if (!keyword.trim()) return rehearsals;
+    const kw = keyword.toLowerCase();
+    return rehearsals.filter((r) =>
+      r.title.toLowerCase().includes(kw) ||
+      (r.description && r.description.toLowerCase().includes(kw)) ||
+      (r.location && r.location.toLowerCase().includes(kw)) ||
+      (r.participants && r.participants.some((p: any) =>
+        (p.userName || '').toLowerCase().includes(kw) ||
+        (p.displayName || '').toLowerCase().includes(kw)
+      ))
+    );
+  }, [rehearsals, keyword]);
+
+  const handleKeywordChange = (value: string) => {
+    setKeyword(value);
+    const params = new URLSearchParams(searchParams);
+    if (value.trim()) {
+      params.set('q', value.trim());
+    } else {
+      params.delete('q');
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   const resetFilters = () => {
     setFilters(emptyFilters);
+    setKeyword('');
   };
 
   const toggleAttendanceExpand = (rehearsalId: number) => {
@@ -249,7 +276,9 @@ export default function CalendarPage() {
           }
         }, 300);
         setTimeout(() => setHighlightedRehearsalId(null), 3000);
-        setSearchParams({}, { replace: true });
+        const params = new URLSearchParams(searchParams);
+        params.delete('rehearsalId');
+        setSearchParams(params, { replace: true });
       }
     }
   }, [searchParams, rehearsals]);
@@ -411,6 +440,25 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      <input
+        type="text"
+        value={keyword}
+        onChange={(e) => handleKeywordChange(e.target.value)}
+        placeholder="搜索排练标题、地点、参与人..."
+        style={{
+          width: '100%',
+          padding: '10px 14px',
+          background: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: 8,
+          color: '#e0e0e0',
+          fontSize: 14,
+          outline: 'none',
+          marginBottom: 20,
+          boxSizing: 'border-box',
+        }}
+      />
+
       {showFilters && (
         <div style={{
           background: '#1a1a1a',
@@ -479,7 +527,7 @@ export default function CalendarPage() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid #333' }}>
             <div style={{ color: '#666', fontSize: 13 }}>
-              当前筛选结果：<span style={{ color: '#3498db' }}>{rehearsals.length}</span> 条排练
+              当前筛选结果：<span style={{ color: '#3498db' }}>{filteredRehearsals.length}</span> 条排练
               {filters.attendanceStatus && !filters.participantId && (
                 <span style={{ color: '#95a5a6', marginLeft: 8 }}>（全局搜索：含任意匹配的参与者）</span>
               )}
@@ -691,7 +739,7 @@ export default function CalendarPage() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {rehearsals.map((r, idx) => {
+        {filteredRehearsals.map((r, idx) => {
           const isHighlighted = highlightedRehearsalId === r.id;
           return (
             <div

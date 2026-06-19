@@ -136,16 +136,32 @@ export default function AnnotationsPage() {
   useEffect(() => {
     const handler = setTimeout(() => {
       loadGrouped(searchQuery || undefined);
+      syncUrlParams();
     }, 300);
     return () => clearTimeout(handler);
   }, [searchQuery]);
+
+  const syncUrlParams = () => {
+    const params = new URLSearchParams(searchParams);
+    if (searchQuery.trim()) {
+      params.set('q', searchQuery.trim());
+    } else {
+      params.delete('q');
+    }
+    if (activeScene !== '__all__' && activeScene !== null) {
+      params.set('scene', String(activeScene));
+    } else {
+      params.delete('scene');
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   useEffect(() => {
     const sceneParam = searchParams.get('scene');
     const annotationIdParam = searchParams.get('annotationId');
     const qParam = searchParams.get('q');
 
-    if (qParam) {
+    if (qParam && qParam !== searchQuery) {
       setSearchQuery(qParam);
     }
 
@@ -153,8 +169,11 @@ export default function AnnotationsPage() {
       if (sceneParam === 'all') {
         setActiveScene('__all__');
       } else {
-        setActiveScene(Number(sceneParam));
-        setTimeout(() => scrollToScene(sceneParam), 200);
+        const sceneNum = Number(sceneParam);
+        if (sceneNum !== activeScene) {
+          setActiveScene(sceneNum);
+          setTimeout(() => scrollToScene(sceneParam), 200);
+        }
       }
     }
 
@@ -162,7 +181,12 @@ export default function AnnotationsPage() {
       const annId = Number(annotationIdParam);
       setHighlightedAnnotationId(annId);
       setTimeout(() => scrollToAnnotation(annId), 300);
-      setTimeout(() => setHighlightedAnnotationId(null), 3000);
+      setTimeout(() => {
+        setHighlightedAnnotationId(null);
+        const params = new URLSearchParams(searchParams);
+        params.delete('annotationId');
+        setSearchParams(params, { replace: true });
+      }, 3000);
     }
   }, [searchParams, groupedData]);
 
@@ -191,9 +215,9 @@ export default function AnnotationsPage() {
   };
 
   const clearJumpParams = () => {
-    const params: Record<string, string> = {};
-    if (searchQuery) params.q = searchQuery;
-    setSearchParams(params);
+    const params = new URLSearchParams(searchParams);
+    params.delete('annotationId');
+    setSearchParams(params, { replace: true });
   };
 
   const loadVersions = async (annotationId: number) => {
@@ -806,7 +830,13 @@ export default function AnnotationsPage() {
             <div style={{ fontWeight: 600, color: '#ccc', fontSize: 13, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>📂 场次导航</span>
               <button
-                onClick={() => { setActiveScene('__all__'); clearJumpParams(); }}
+                onClick={() => {
+                  setActiveScene('__all__');
+                  const params = new URLSearchParams(searchParams);
+                  params.delete('scene');
+                  params.delete('annotationId');
+                  setSearchParams(params, { replace: true });
+                }}
                 style={{
                   fontSize: 11,
                   padding: '2px 8px',
@@ -910,7 +940,13 @@ export default function AnnotationsPage() {
                       </span>
                       {activeScene !== '__all__' && (
                         <button
-                          onClick={() => { setActiveScene('__all__'); clearJumpParams(); }}
+                          onClick={() => {
+                            setActiveScene('__all__');
+                            const params = new URLSearchParams(searchParams);
+                            params.delete('scene');
+                            params.delete('annotationId');
+                            setSearchParams(params, { replace: true });
+                          }}
                           style={{
                             marginLeft: 'auto',
                             fontSize: 11,

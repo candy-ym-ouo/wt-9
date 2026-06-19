@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -52,6 +52,30 @@ export default function RolesPage() {
 
   useEffect(() => { load(); }, []);
 
+  const filteredRoles = useMemo(() => {
+    if (!keyword.trim()) return roles;
+    const kw = keyword.toLowerCase();
+    return roles.filter((r) =>
+      r.characterName.toLowerCase().includes(kw) ||
+      (r.characterDescription && r.characterDescription.toLowerCase().includes(kw)) ||
+      (r.actorName && r.actorName.toLowerCase().includes(kw)) ||
+      (r.substituteActors && r.substituteActors.some((s) =>
+        (s.displayName || s.username || '').toLowerCase().includes(kw)
+      ))
+    );
+  }, [roles, keyword]);
+
+  const handleKeywordChange = (value: string) => {
+    setKeyword(value);
+    const params = new URLSearchParams(searchParams);
+    if (value.trim()) {
+      params.set('q', value.trim());
+    } else {
+      params.delete('q');
+    }
+    setSearchParams(params, { replace: true });
+  };
+
   useEffect(() => {
     const roleIdParam = searchParams.get('roleId');
     if (roleIdParam && roles.length > 0) {
@@ -66,7 +90,9 @@ export default function RolesPage() {
           }
         }, 300);
         setTimeout(() => setHighlightedRoleId(null), 3000);
-        setSearchParams({}, { replace: true });
+        const params = new URLSearchParams(searchParams);
+        params.delete('roleId');
+        setSearchParams(params, { replace: true });
       }
     }
   }, [searchParams, roles]);
@@ -219,6 +245,27 @@ export default function RolesPage() {
         </div>
       </div>
 
+      {!sortMode && (
+        <input
+          type="text"
+          value={keyword}
+          onChange={(e) => handleKeywordChange(e.target.value)}
+          placeholder="搜索角色名、演员、描述..."
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            background: '#1a1a1a',
+            border: '1px solid #333',
+            borderRadius: 8,
+            color: '#e0e0e0',
+            fontSize: 14,
+            outline: 'none',
+            marginBottom: 20,
+            boxSizing: 'border-box',
+          }}
+        />
+      )}
+
       {sortMode && (
         <div style={{
           padding: '10px 16px',
@@ -253,7 +300,7 @@ export default function RolesPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-        {roles.map((r, index) => {
+        {(sortMode ? roles : filteredRoles).map((r, index) => {
           const status = statusLabel(r);
           const availableActors = getAvailableActorsForSubstitute(r);
           const isDragging = draggedId === r.id;
@@ -447,7 +494,11 @@ export default function RolesPage() {
           );
         })}
       </div>
-      {roles.length === 0 && <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>暂无角色</div>}
+      {(sortMode ? roles : filteredRoles).length === 0 && (
+        <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>
+          {keyword && !sortMode ? '没有匹配的角色' : '暂无角色'}
+        </div>
+      )}
     </div>
   );
 }
