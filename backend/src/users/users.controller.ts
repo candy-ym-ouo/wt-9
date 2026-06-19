@@ -23,8 +23,8 @@ export class UsersController {
   @Put(':id/role')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  updateRole(@Param('id') id: number, @Body() body: { role: UserRole }) {
-    return this.usersService.updateRole(id, body.role);
+  updateRole(@Param('id') id: number, @Body() body: { role: UserRole }, @Request() req: any) {
+    return this.usersService.updateRole(id, body.role, req.user.userId, req.user.username);
   }
 
   @Put(':id/freeze')
@@ -44,7 +44,7 @@ export class UsersController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  remove(@Param('id') id: number) {
-    return this.usersService.remove(id);
+  remove(@Param('id') id: number, @Request() req: any) {
+    return this.usersService.remove(id, req.user.userId, req.user.username);
   }
 }

@@ -7,4 +7,4 @@ export { Material } from './material.entity';
 export { LeaveRequest, LeaveStatus, LeaveType } from './leave.entity';
 export { ReminderConfig, ReminderType, ReminderChannel } from './reminder-config.entity';
 export { Reminder, ReminderStatus } from './reminder.entity';
-export { AuditLog, AuditAction } from './audit-log.entity';
+export { AuditLog, AuditAction, AuditModule } from './audit-log.entity';

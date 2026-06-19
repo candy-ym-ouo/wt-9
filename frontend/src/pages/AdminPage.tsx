@@ -67,7 +67,7 @@ export default function AdminPage() {
     setUsers(usersData);
     setLeaveStats(statsData);
     setAttendanceStats(attendanceData);
-    setAuditLogs(logsData);
+    setAuditLogs(logsData.enriched || logsData.items || logsData);
   };
 
   const loadMaterials = async () => {

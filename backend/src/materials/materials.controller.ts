@@ -118,31 +118,35 @@ export class MaterialsController {
     const parsedTags = tagsStr ? tagsStr.split(',').map((t) => t.trim()).filter(Boolean) : [];
     const parsedDownloadRoles = downloadRolesStr ? downloadRolesStr.split(',').map((r) => r.trim()).filter(Boolean) : [];
 
-    return this.service.create({
-      originalName: file.originalname,
-      storedName: file.filename,
-      mimeType: file.mimetype,
-      size: file.size,
-      category: category || 'general',
-      categories: parsedCategories.length > 0 ? parsedCategories : (category ? [category] : ['general']),
-      tags: parsedTags,
-      downloadRoles: parsedDownloadRoles,
-      description: description || '',
-      createdBy: req.user.userId,
-    });
+    return this.service.create(
+      {
+        originalName: file.originalname,
+        storedName: file.filename,
+        mimeType: file.mimetype,
+        size: file.size,
+        category: category || 'general',
+        categories: parsedCategories.length > 0 ? parsedCategories : (category ? [category] : ['general']),
+        tags: parsedTags,
+        downloadRoles: parsedDownloadRoles,
+        description: description || '',
+        createdBy: req.user.userId,
+      },
+      req.user.userId,
+      req.user.username,
+    );
   }
 
   @Put(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  async update(@Param('id') id: number, @Body() body: Partial<Material>) {
-    return this.service.update(id, body);
+  async update(@Param('id') id: number, @Body() body: Partial<Material>, @Request() req: any) {
+    return this.service.update(id, body, req.user.userId, req.user.username);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  remove(@Param('id') id: number) {
-    return this.service.remove(id);
+  remove(@Param('id') id: number, @Request() req: any) {
+    return this.service.remove(id, req.user.userId, req.user.username);
   }
 }

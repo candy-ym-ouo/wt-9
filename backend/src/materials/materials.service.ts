@@ -1,7 +1,8 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Material, Rehearsal, Annotation } from '../entities';
+import { Material, Rehearsal, Annotation, AuditAction, AuditModule } from '../entities';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 export interface MaterialReference {
   type: 'rehearsal' | 'annotation';
@@ -19,16 +20,37 @@ export class MaterialsService {
     private rehearsalRepo: Repository<Rehearsal>,
     @InjectRepository(Annotation)
     private annotationRepo: Repository<Annotation>,
+    private auditLogsService: AuditLogsService,
   ) {}
 
-  async create(data: Partial<Material>) {
+  async create(data: Partial<Material>, operatorId?: number, operatorName?: string) {
     const item = this.repo.create(data);
     if (!item.categories || item.categories.length === 0) {
       item.categories = item.category ? [item.category] : ['general'];
     }
     if (!item.tags) item.tags = [];
     if (!item.downloadRoles) item.downloadRoles = [];
-    return this.repo.save(item);
+    const saved = await this.repo.save(item);
+
+    if (operatorId !== undefined) {
+      await this.auditLogsService.log({
+        action: AuditAction.CREATE_MATERIAL,
+        module: AuditModule.MATERIAL,
+        operatorId,
+        operatorName,
+        targetId: saved.id,
+        targetType: 'material',
+        detail: `上传素材「${saved.originalName}」`,
+        metadata: {
+          originalName: saved.originalName,
+          size: saved.size,
+          mimeType: saved.mimeType,
+          categories: saved.categories,
+        },
+      });
+    }
+
+    return saved;
   }
 
   async findAll(params?: { categories?: string; tags?: string; keyword?: string }) {
@@ -136,12 +158,44 @@ export class MaterialsService {
     return material.downloadRoles.includes(userRole);
   }
 
-  async update(id: number, data: Partial<Material>) {
+  async update(id: number, data: Partial<Material>, operatorId?: number, operatorName?: string) {
+    const oldMaterial = await this.repo.findOne({ where: { id } });
     await this.repo.update(id, data);
-    return this.findOne(id);
+    const updated = await this.findOne(id);
+
+    if (oldMaterial && operatorId !== undefined) {
+      const changes: string[] = [];
+      if (data.categories) {
+        changes.push(`分类变更`);
+      }
+      if (data.tags) {
+        changes.push(`标签变更`);
+      }
+      if (data.description !== undefined && data.description !== oldMaterial.description) {
+        changes.push(`描述变更`);
+      }
+      if (data.downloadRoles) {
+        changes.push(`下载权限变更`);
+      }
+
+      await this.auditLogsService.log({
+        action: AuditAction.UPDATE_MATERIAL,
+        module: AuditModule.MATERIAL,
+        operatorId,
+        operatorName,
+        targetId: id,
+        targetType: 'material',
+        detail: changes.length > 0
+          ? `更新素材「${oldMaterial.originalName}」: ${changes.join('; ')}`
+          : `更新素材「${oldMaterial.originalName}」`,
+        metadata: { old: oldMaterial, new: data },
+      });
+    }
+
+    return updated;
   }
 
-  async remove(id: number) {
+  async remove(id: number, operatorId?: number, operatorName?: string) {
     const refCount = await this.getReferenceCount(id);
     if (refCount.total > 0) {
       throw new HttpException(
@@ -149,6 +203,25 @@ export class MaterialsService {
         HttpStatus.CONFLICT,
       );
     }
+
+    const material = await this.repo.findOne({ where: { id } });
+    if (material && operatorId !== undefined) {
+      await this.auditLogsService.log({
+        action: AuditAction.DELETE_MATERIAL,
+        module: AuditModule.MATERIAL,
+        operatorId,
+        operatorName,
+        targetId: id,
+        targetType: 'material',
+        detail: `删除素材「${material.originalName}」`,
+        metadata: {
+          originalName: material.originalName,
+          size: material.size,
+          categories: material.categories,
+        },
+      });
+    }
+
     return this.repo.delete(id);
   }
 

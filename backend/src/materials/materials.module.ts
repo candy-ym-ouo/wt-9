@@ -3,9 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Material, Rehearsal, Annotation } from '../entities';
 import { MaterialsService } from './materials.service';
 import { MaterialsController } from './materials.controller';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Material, Rehearsal, Annotation])],
+  imports: [TypeOrmModule.forFeature([Material, Rehearsal, Annotation]), AuditLogsModule],
   providers: [MaterialsService],
   controllers: [MaterialsController],
   exports: [MaterialsService],

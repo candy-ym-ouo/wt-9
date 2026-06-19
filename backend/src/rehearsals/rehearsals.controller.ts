@@ -80,14 +80,18 @@ export class RehearsalsController {
     @Request() req: any,
   ) {
     try {
-      return await this.service.create({
-        ...body,
-        startTime: new Date(body.startTime),
-        endTime: new Date(body.endTime),
-        createdBy: req.user.userId,
-        participantIds: body.participantIds || [],
-        materialIds: body.materialIds || [],
-      });
+      return await this.service.create(
+        {
+          ...body,
+          startTime: new Date(body.startTime),
+          endTime: new Date(body.endTime),
+          createdBy: req.user.userId,
+          participantIds: body.participantIds || [],
+          materialIds: body.materialIds || [],
+        },
+        req.user.userId,
+        req.user.username,
+      );
     } catch (e: any) {
       throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
     }
@@ -113,12 +117,13 @@ export class RehearsalsController {
       participantIds: number[];
       materialIds: number[];
     }>,
+    @Request() req: any,
   ) {
     try {
       const data: any = { ...body };
       if (body.startTime) data.startTime = new Date(body.startTime);
       if (body.endTime) data.endTime = new Date(body.endTime);
-      return await this.service.update(id, data);
+      return await this.service.update(id, data, req.user.userId, req.user.username);
     } catch (e: any) {
       throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
     }
@@ -137,14 +142,15 @@ export class RehearsalsController {
         absentReason?: string;
       }>;
     },
+    @Request() req: any,
   ) {
-    return this.service.updateAttendance(id, body.updates);
+    return this.service.updateAttendance(id, body.updates, req.user.userId, req.user.username);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  remove(@Param('id') id: number) {
-    return this.service.remove(id);
+  remove(@Param('id') id: number, @Request() req: any) {
+    return this.service.remove(id, req.user.userId, req.user.username);
   }
 }

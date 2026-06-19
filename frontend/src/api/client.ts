@@ -67,15 +67,34 @@ export const api = {
     remove: (id: number) => request<any>(`/users/${id}`, { method: 'DELETE' }),
   },
   auditLogs: {
-    list: (params?: { targetUserId?: number; action?: string; limit?: number; offset?: number }) => {
+    list: (params?: {
+      targetUserId?: number;
+      operatorId?: number;
+      action?: string;
+      module?: string;
+      targetType?: string;
+      keyword?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      limit?: number;
+      offset?: number;
+    }) => {
       const searchParams = new URLSearchParams();
       if (params?.targetUserId) searchParams.set('targetUserId', String(params.targetUserId));
+      if (params?.operatorId) searchParams.set('operatorId', String(params.operatorId));
       if (params?.action) searchParams.set('action', params.action);
+      if (params?.module) searchParams.set('module', params.module);
+      if (params?.targetType) searchParams.set('targetType', params.targetType);
+      if (params?.keyword) searchParams.set('keyword', params.keyword);
+      if (params?.dateFrom) searchParams.set('dateFrom', params.dateFrom);
+      if (params?.dateTo) searchParams.set('dateTo', params.dateTo);
       if (params?.limit) searchParams.set('limit', String(params.limit));
       if (params?.offset) searchParams.set('offset', String(params.offset));
       const q = searchParams.toString();
-      return request<any[]>(`/audit-logs${q ? '?' + q : ''}`);
+      return request<any>(`/audit-logs${q ? '?' + q : ''}`);
     },
+    meta: () => request<any>('/audit-logs/meta'),
+    get: (id: number) => request<any>(`/audit-logs/${id}`),
   },
   rehearsals: {
     list: (params?: {

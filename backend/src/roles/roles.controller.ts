@@ -35,26 +35,30 @@ export class RolesController {
     },
     @Request() req: any,
   ) {
-    return this.service.create({
-      ...body,
-      createdBy: req.user.userId,
-      sceneNumbers: body.sceneNumbers || [],
-      substituteActorIds: body.substituteActorIds || [],
-    });
+    return this.service.create(
+      {
+        ...body,
+        createdBy: req.user.userId,
+        sceneNumbers: body.sceneNumbers || [],
+        substituteActorIds: body.substituteActorIds || [],
+      },
+      req.user.userId,
+      req.user.username,
+    );
   }
 
   @Put(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  update(@Param('id') id: number, @Body() body: Partial<CastRole>) {
-    return this.service.update(id, body);
+  update(@Param('id') id: number, @Body() body: Partial<CastRole>, @Request() req: any) {
+    return this.service.update(id, body, req.user.userId, req.user.username);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  remove(@Param('id') id: number) {
-    return this.service.remove(id);
+  remove(@Param('id') id: number, @Request() req: any) {
+    return this.service.remove(id, req.user.userId, req.user.username);
   }
 
   @Post(':id/substitutes')
@@ -63,8 +67,9 @@ export class RolesController {
   addSubstitute(
     @Param('id') roleId: number,
     @Body() body: { actorId: number },
+    @Request() req: any,
   ) {
-    return this.service.addSubstitute(roleId, body.actorId);
+    return this.service.addSubstitute(roleId, body.actorId, req.user.userId, req.user.username);
   }
 
   @Delete(':id/substitutes/:actorId')
@@ -73,8 +78,9 @@ export class RolesController {
   removeSubstitute(
     @Param('id') roleId: number,
     @Param('actorId') actorId: number,
+    @Request() req: any,
   ) {
-    return this.service.removeSubstitute(roleId, actorId);
+    return this.service.removeSubstitute(roleId, actorId, req.user.userId, req.user.username);
   }
 
   @Put('priorities/batch')
@@ -82,7 +88,8 @@ export class RolesController {
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   updatePriorities(
     @Body() body: { updates: Array<{ id: number; priority: number }> },
+    @Request() req: any,
   ) {
-    return this.service.updatePriorities(body.updates);
+    return this.service.updatePriorities(body.updates, req.user.userId, req.user.username);
   }
 }

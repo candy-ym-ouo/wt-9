@@ -4,9 +4,10 @@ import { CastRole, User } from '../entities';
 import { RolesService } from './roles.service';
 import { RolesController } from './roles.controller';
 import { LeavesModule } from '../leaves/leaves.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CastRole, User]), LeavesModule],
+  imports: [TypeOrmModule.forFeature([CastRole, User]), LeavesModule, AuditLogsModule],
   providers: [RolesService],
   controllers: [RolesController],
   exports: [RolesService],

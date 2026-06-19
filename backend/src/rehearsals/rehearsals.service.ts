@@ -1,8 +1,9 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, Not, In } from 'typeorm';
-import { Rehearsal, User, CastRole, LeaveRequest, LeaveStatus, Material } from '../entities';
+import { Rehearsal, User, CastRole, LeaveRequest, LeaveStatus, Material, AuditAction, AuditModule } from '../entities';
 import { LeavesService } from '../leaves/leaves.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 export interface ConflictInfo {
   hasConflict: boolean;
@@ -68,6 +69,7 @@ export class RehearsalsService {
     @InjectRepository(Material)
     private materialRepo: Repository<Material>,
     private leavesService: LeavesService,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   async checkConflicts(
@@ -149,7 +151,7 @@ export class RehearsalsService {
     return start1 < end2 && end1 > start2;
   }
 
-  async create(data: Partial<Rehearsal>) {
+  async create(data: Partial<Rehearsal>, operatorId?: number, operatorName?: string) {
     const startTime = data.startTime instanceof Date ? data.startTime : new Date(data.startTime!);
     const endTime = data.endTime instanceof Date ? data.endTime : new Date(data.endTime!);
 
@@ -183,7 +185,30 @@ export class RehearsalsService {
     }
 
     const item = this.repo.create({ ...data, materialIds });
-    return this.repo.save(item);
+    const saved = await this.repo.save(item);
+
+    if (operatorId !== undefined) {
+      const timeStr = `${startTime.toLocaleString('zh-CN')} ~ ${endTime.toLocaleString('zh-CN')}`;
+      await this.auditLogsService.log({
+        action: AuditAction.CREATE_REHEARSAL,
+        module: AuditModule.REHEARSAL,
+        operatorId,
+        operatorName,
+        targetId: saved.id,
+        targetType: 'rehearsal',
+        detail: `创建排练「${saved.title}」(${data.location || '无地点'}, ${timeStr})`,
+        metadata: {
+          title: saved.title,
+          location: saved.location,
+          startTime: saved.startTime,
+          endTime: saved.endTime,
+          participantIds: saved.participantIds,
+          materialIds: saved.materialIds,
+        },
+      });
+    }
+
+    return saved;
   }
 
   async findAll() {
@@ -284,7 +309,7 @@ export class RehearsalsService {
     return this.repo.findOne({ where: { id } });
   }
 
-  async update(id: number, data: Partial<Rehearsal>) {
+  async update(id: number, data: Partial<Rehearsal>, operatorId?: number, operatorName?: string) {
     const existing = await this.repo.findOne({ where: { id } });
     if (!existing) {
       throw new BadRequestException('排练不存在');
@@ -343,10 +368,61 @@ export class RehearsalsService {
       participantIds,
       materialIds,
     });
+
+    if (operatorId !== undefined) {
+      const changes: string[] = [];
+      if (data.title && data.title !== existing.title) {
+        changes.push(`标题: ${existing.title} → ${data.title}`);
+      }
+      if (data.location !== undefined && data.location !== existing.location) {
+        changes.push(`地点: ${existing.location || '无'} → ${data.location || '无'}`);
+      }
+      if (data.startTime || data.endTime) {
+        changes.push(`时间变更`);
+      }
+      if (data.participantIds) {
+        changes.push(`参与人员变更`);
+      }
+      if (data.materialIds) {
+        changes.push(`关联素材变更`);
+      }
+
+      await this.auditLogsService.log({
+        action: AuditAction.UPDATE_REHEARSAL,
+        module: AuditModule.REHEARSAL,
+        operatorId,
+        operatorName,
+        targetId: id,
+        targetType: 'rehearsal',
+        detail: changes.length > 0
+          ? `更新排练「${existing.title}」: ${changes.join('; ')}`
+          : `更新排练「${existing.title}」`,
+        metadata: { old: existing, new: data },
+      });
+    }
+
     return this.repo.findOne({ where: { id } });
   }
 
-  async remove(id: number) {
+  async remove(id: number, operatorId?: number, operatorName?: string) {
+    const rehearsal = await this.repo.findOne({ where: { id } });
+    if (rehearsal && operatorId !== undefined) {
+      await this.auditLogsService.log({
+        action: AuditAction.DELETE_REHEARSAL,
+        module: AuditModule.REHEARSAL,
+        operatorId,
+        operatorName,
+        targetId: id,
+        targetType: 'rehearsal',
+        detail: `删除排练「${rehearsal.title}」`,
+        metadata: {
+          title: rehearsal.title,
+          location: rehearsal.location,
+          startTime: rehearsal.startTime,
+          endTime: rehearsal.endTime,
+        },
+      });
+    }
     return this.repo.delete(id);
   }
 
@@ -478,7 +554,7 @@ export class RehearsalsService {
     return { ...enriched[0], ...withConflict[0] };
   }
 
-  async updateAttendance(id: number, updates: AttendanceUpdate[]) {
+  async updateAttendance(id: number, updates: AttendanceUpdate[], operatorId?: number, operatorName?: string) {
     const existing = await this.repo.findOne({ where: { id } });
     if (!existing) {
       throw new BadRequestException('排练不存在');
@@ -487,12 +563,30 @@ export class RehearsalsService {
     const currentAttendance = existing.attendance || {};
     const newAttendance: Record<string, any> = { ...currentAttendance };
 
+    const statusLabels: Record<string, string> = {
+      present: '出勤',
+      absent: '缺席',
+      late: '迟到',
+      null: '未签到',
+    };
+
+    const changeDetails: string[] = [];
+
     for (const update of updates) {
       if (!existing.participantIds?.includes(update.userId)) {
         continue;
       }
       const key = String(update.userId);
       const existingRecord = currentAttendance[key] || currentAttendance[update.userId];
+      const oldStatus = existingRecord?.status || null;
+      const newStatus = update.status;
+
+      if (oldStatus !== newStatus) {
+        const user = await this.userRepo.findOne({ where: { id: update.userId } });
+        const userName = user?.displayName || user?.username || `#${update.userId}`;
+        changeDetails.push(`${userName}: ${statusLabels[String(oldStatus)] || '未签到'} → ${statusLabels[String(newStatus)] || '未签到'}`);
+      }
+
       newAttendance[key] = {
         status: update.status,
         absentReason: update.absentReason,
@@ -503,6 +597,20 @@ export class RehearsalsService {
     }
 
     await this.repo.update(id, { attendance: newAttendance });
+
+    if (operatorId !== undefined && changeDetails.length > 0) {
+      await this.auditLogsService.log({
+        action: AuditAction.UPDATE_ATTENDANCE,
+        module: AuditModule.REHEARSAL,
+        operatorId,
+        operatorName,
+        targetId: id,
+        targetType: 'rehearsal',
+        detail: `更新排练「${existing.title}」考勤: ${changeDetails.join('; ')}`,
+        metadata: { updates },
+      });
+    }
+
     return this.findOneWithDetails(id);
   }
 
