@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
-import { User, Rehearsal, CastRole, Annotation, Material, LeaveRequest } from './entities';
+import { User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RehearsalsModule } from './rehearsals/rehearsals.module';
@@ -17,7 +17,7 @@ import { LeavesModule } from './leaves/leaves.module';
       type: 'sqljs',
       location: join(process.cwd(), 'theater.db'),
       autoSave: true,
-      entities: [User, Rehearsal, CastRole, Annotation, Material, LeaveRequest],
+      entities: [User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest],
       synchronize: true,
     }),
     AuthModule,

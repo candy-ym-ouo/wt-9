@@ -9,6 +9,52 @@ interface SearchResult {
   total: number;
 }
 
+function highlightSearchResult(
+  text: string,
+  highlights?: { field: string; start: number; end: number }[],
+  fieldName?: string
+) {
+  if (!highlights || highlights.length === 0 || !fieldName) {
+    return <span>"{text}"</span>;
+  }
+
+  const fieldHighlights = highlights.filter((h) => h.field === fieldName);
+  if (fieldHighlights.length === 0) {
+    return <span>"{text}"</span>;
+  }
+
+  const sorted = [...fieldHighlights].sort((a, b) => a.start - b.start);
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const h of sorted) {
+    if (h.start > lastIndex) {
+      parts.push(<span key={`t-${lastIndex}`}>{text.slice(lastIndex, h.start)}</span>);
+    }
+    parts.push(
+      <mark
+        key={`h-${h.start}`}
+        style={{
+          background: '#f39c12',
+          color: '#000',
+          padding: '0 2px',
+          borderRadius: 2,
+        }}
+      >
+        {text.slice(h.start, h.end)}
+      </mark>
+    );
+    lastIndex = h.end;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(<span key={`t-${lastIndex}`}>{text.slice(lastIndex)}</span>);
+  }
+
+  return <>{parts}</>;
+}
+
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult | null>(null);
@@ -197,9 +243,45 @@ export default function SearchPage() {
               <h3 style={{ color: '#2ecc71', fontSize: 15, marginBottom: 12 }}>📝 批注 ({results.annotations.length})</h3>
               {results.annotations.map((a: any) => (
                 <div key={a.id} style={cardStyle}>
-                  <div style={{ fontStyle: 'italic', color: '#e0e0e0', fontSize: 14 }}>"{a.scriptContent}"</div>
-                  {a.note && <div style={{ fontSize: 13, color: '#aaa', marginTop: 4 }}>→ {a.note}</div>}
-                  {a.tag && <span style={{ background: '#333', color: '#aaa', padding: '2px 6px', borderRadius: 8, fontSize: 11, marginTop: 4, display: 'inline-block' }}>{a.tag}</span>}
+                  <div style={{ fontStyle: 'italic', color: '#e0e0e0', fontSize: 14 }}>
+                    {highlightSearchResult(a.scriptContent, a.highlights, 'scriptContent')}
+                  </div>
+                  {a.note && (
+                    <div style={{ fontSize: 13, color: '#aaa', marginTop: 4 }}>
+                      → {highlightSearchResult(a.note, a.highlights, 'note')}
+                    </div>
+                  )}
+                  {a.tag && (
+                    <span
+                      style={{
+                        background: '#333',
+                        color: '#aaa',
+                        padding: '2px 6px',
+                        borderRadius: 8,
+                        fontSize: 11,
+                        marginTop: 4,
+                        display: 'inline-block',
+                      }}
+                    >
+                      {a.tag}
+                    </span>
+                  )}
+                  {a.sceneNumber && (
+                    <span
+                      style={{
+                        background: '#2a2a2a',
+                        color: '#888',
+                        padding: '2px 6px',
+                        borderRadius: 8,
+                        fontSize: 11,
+                        marginLeft: 6,
+                        marginTop: 4,
+                        display: 'inline-block',
+                      }}
+                    >
+                      第{a.sceneNumber}场
+                    </span>
+                  )}
                 </div>
               ))}
             </section>

@@ -11,7 +11,7 @@ export class AnnotationsController {
   constructor(private service: AnnotationsService) {}
 
   @Get()
-  findAll(@Query('scene') scene?: string) {
+  findAll(@Query('scene') scene?: string, @Query('search') search?: string) {
     if (scene) {
       return this.service.findByScene(Number(scene));
     }
@@ -21,6 +21,25 @@ export class AnnotationsController {
   @Get(':id')
   findOne(@Param('id') id: number) {
     return this.service.findOne(id);
+  }
+
+  @Get(':id/versions')
+  getVersions(@Param('id') id: number) {
+    return this.service.getVersions(id);
+  }
+
+  @Get(':id/versions/:versionId')
+  getVersion(@Param('id') id: number, @Param('versionId') versionId: number) {
+    return this.service.getVersion(versionId);
+  }
+
+  @Post(':id/versions/:versionId/restore')
+  restoreToVersion(
+    @Param('id') id: number,
+    @Param('versionId') versionId: number,
+    @Request() req: any,
+  ) {
+    return this.service.restoreToVersion(id, versionId, req.user.userId, req.user.role);
   }
 
   @Post()
@@ -36,18 +55,22 @@ export class AnnotationsController {
     },
     @Request() req: any,
   ) {
-    return this.service.create({ ...body, createdBy: req.user.userId });
+    return this.service.create({ ...body, createdBy: req.user.userId }, req.user.userId);
   }
 
   @Put(':id')
-  update(@Param('id') id: number, @Body() body: Partial<Annotation>) {
-    return this.service.update(id, body);
+  update(
+    @Param('id') id: number,
+    @Body() body: Partial<Annotation>,
+    @Request() req: any,
+  ) {
+    return this.service.update(id, body, req.user.userId, req.user.role);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  remove(@Param('id') id: number) {
-    return this.service.remove(id);
+  remove(@Param('id') id: number, @Request() req: any) {
+    return this.service.remove(id, req.user.userId, req.user.role);
   }
 }

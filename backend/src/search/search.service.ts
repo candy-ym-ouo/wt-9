@@ -4,6 +4,7 @@ import { Repository, Like } from 'typeorm';
 import { Rehearsal, CastRole, Annotation, Material } from '../entities';
 import { RehearsalsService } from '../rehearsals/rehearsals.service';
 import { RolesService } from '../roles/roles.service';
+import { AnnotationsService } from '../annotations/annotations.service';
 
 @Injectable()
 export class SearchService {
@@ -18,6 +19,7 @@ export class SearchService {
     private materialRepo: Repository<Material>,
     private rehearsalsService: RehearsalsService,
     private rolesService: RolesService,
+    private annotationsService: AnnotationsService,
   ) {}
 
   async search(query: string) {
@@ -68,10 +70,12 @@ export class SearchService {
       }
     }
 
+    const highlightedAnnotations = this.annotationsService.searchInScript(query, annotations);
+
     return {
       rehearsals: enrichedRehearsals,
       roles: enrichedRoles,
-      annotations,
+      annotations: highlightedAnnotations,
       materials,
       total: rehearsals.length + roles.length + annotations.length + materials.length,
     };

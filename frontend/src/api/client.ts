@@ -103,6 +103,11 @@ export const api = {
     update: (id: number, data: any) =>
       request<any>(`/annotations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id: number) => request<any>(`/annotations/${id}`, { method: 'DELETE' }),
+    getVersions: (id: number) => request<any[]>(`/annotations/${id}/versions`),
+    getVersion: (id: number, versionId: number) =>
+      request<any>(`/annotations/${id}/versions/${versionId}`),
+    restoreToVersion: (id: number, versionId: number) =>
+      request<any>(`/annotations/${id}/versions/${versionId}/restore`, { method: 'POST' }),
   },
   materials: {
     list: (category?: string) => {
