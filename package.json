@@ -1,0 +1,14 @@
+{
+  "name": "theater-rehearsal-archive",
+  "version": "1.0.0",
+  "description": "实验戏剧排练档案系统",
+  "private": true,
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev": "cd backend && npx nest start --watch & cd frontend && npx vite --host",
+    "dev:backend": "cd backend && npm run start:dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "seed": "cd backend && npx ts-node src/seed.ts"
+  }
+}

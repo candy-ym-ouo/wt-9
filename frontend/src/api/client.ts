@@ -1,0 +1,95 @@
+const BASE = '/api';
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+  return res.json();
+}
+
+async function uploadFile(path: string, file: File, params?: Record<string, string>) {
+  const token = localStorage.getItem('token');
+  const formData = new FormData();
+  formData.append('file', file);
+  const query = params ? '?' + new URLSearchParams(params).toString() : '';
+  const res = await fetch(`${BASE}${path}${query}`, {
+    method: 'POST',
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: formData,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export const api = {
+  auth: {
+    login: (username: string, password: string) =>
+      request<any>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    register: (data: any) =>
+      request<any>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    profile: () => request<any>('/auth/profile'),
+  },
+  users: {
+    list: () => request<any[]>('/users'),
+    updateRole: (id: number, role: string) =>
+      request<any>(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+    remove: (id: number) => request<any>(`/users/${id}`, { method: 'DELETE' }),
+  },
+  rehearsals: {
+    list: (start?: string, end?: string) => {
+      const params = new URLSearchParams();
+      if (start) params.set('start', start);
+      if (end) params.set('end', end);
+      const q = params.toString();
+      return request<any[]>(`/rehearsals${q ? '?' + q : ''}`);
+    },
+    get: (id: number) => request<any>(`/rehearsals/${id}`),
+    create: (data: any) =>
+      request<any>('/rehearsals', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) =>
+      request<any>(`/rehearsals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => request<any>(`/rehearsals/${id}`, { method: 'DELETE' }),
+  },
+  roles: {
+    list: () => request<any[]>('/roles'),
+    get: (id: number) => request<any>(`/roles/${id}`),
+    create: (data: any) =>
+      request<any>('/roles', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) =>
+      request<any>(`/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => request<any>(`/roles/${id}`, { method: 'DELETE' }),
+  },
+  annotations: {
+    list: (scene?: string) => {
+      const params = scene ? `?scene=${scene}` : '';
+      return request<any[]>(`/annotations${params}`);
+    },
+    get: (id: number) => request<any>(`/annotations/${id}`),
+    create: (data: any) =>
+      request<any>('/annotations', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) =>
+      request<any>(`/annotations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => request<any>(`/annotations/${id}`, { method: 'DELETE' }),
+  },
+  materials: {
+    list: (category?: string) => {
+      const params = category ? `?category=${category}` : '';
+      return request<any[]>(`/materials${params}`);
+    },
+    get: (id: number) => request<any>(`/materials/${id}`),
+    upload: (file: File, category?: string, description?: string) =>
+      uploadFile('/materials/upload', file, { category: category || 'general', description: description || '' }),
+    remove: (id: number) => request<any>(`/materials/${id}`, { method: 'DELETE' }),
+    downloadUrl: (id: number) => `${BASE}/materials/${id}/download`,
+  },
+  search: {
+    query: (q: string) => request<any>(`/search?q=${encodeURIComponent(q)}`),
+  },
+};
