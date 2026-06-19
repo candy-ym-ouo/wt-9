@@ -13,7 +13,15 @@ interface Annotation {
   createdBy: number;
   createdAt: string;
   updatedAt: string;
+  materialIds?: number[];
   highlights?: { field: string; start: number; end: number }[];
+}
+
+interface MaterialLite {
+  id: number;
+  originalName: string;
+  category?: string;
+  categories?: string[];
 }
 
 interface AnnotationVersion {
@@ -47,6 +55,7 @@ const actionColors: Record<string, string> = {
 
 export default function AnnotationsPage() {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [materials, setMaterials] = useState<MaterialLite[]>([]);
   const [sceneFilter, setSceneFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -58,6 +67,7 @@ export default function AnnotationsPage() {
     sceneNumber: '',
     startOffset: '',
     endOffset: '',
+    materialIds: [] as number[],
   });
   const [versions, setVersions] = useState<Record<number, AnnotationVersion[]>>({});
   const [showVersions, setShowVersions] = useState<number | null>(null);
@@ -73,8 +83,18 @@ export default function AnnotationsPage() {
     setAnnotations(data);
   };
 
+  const loadMaterials = async () => {
+    try {
+      const data = await api.materials.list();
+      setMaterials(data);
+    } catch (e) {
+      console.error('加载素材列表失败', e);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadMaterials();
   }, [sceneFilter]);
 
   const loadVersions = async (annotationId: number) => {
@@ -101,8 +121,9 @@ export default function AnnotationsPage() {
       sceneNumber: form.sceneNumber ? Number(form.sceneNumber) : undefined,
       startOffset: form.startOffset ? Number(form.startOffset) : undefined,
       endOffset: form.endOffset ? Number(form.endOffset) : undefined,
+      materialIds: form.materialIds.length > 0 ? form.materialIds : undefined,
     });
-    setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '' });
+    setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
     setShowForm(false);
     load();
   };
@@ -116,6 +137,7 @@ export default function AnnotationsPage() {
       sceneNumber: annotation.sceneNumber?.toString() || '',
       startOffset: annotation.startOffset?.toString() || '',
       endOffset: annotation.endOffset?.toString() || '',
+      materialIds: annotation.materialIds || [],
     });
   };
 
@@ -130,9 +152,10 @@ export default function AnnotationsPage() {
         sceneNumber: form.sceneNumber ? Number(form.sceneNumber) : undefined,
         startOffset: form.startOffset ? Number(form.startOffset) : undefined,
         endOffset: form.endOffset ? Number(form.endOffset) : undefined,
+        materialIds: form.materialIds,
       });
       setEditingId(null);
-      setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '' });
+      setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
       load();
     } catch (err: any) {
       alert(err.message || '更新失败');
@@ -141,7 +164,7 @@ export default function AnnotationsPage() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '' });
+    setForm({ scriptContent: '', note: '', tag: '', sceneNumber: '', startOffset: '', endOffset: '', materialIds: [] });
   };
 
   const handleDelete = async (id: number) => {
@@ -168,6 +191,15 @@ export default function AnnotationsPage() {
     } catch (err: any) {
       alert(err.message || '恢复失败');
     }
+  };
+
+  const toggleMaterial = (materialId: number) => {
+    setForm((prev) => ({
+      ...prev,
+      materialIds: prev.materialIds.includes(materialId)
+        ? prev.materialIds.filter((id) => id !== materialId)
+        : [...prev.materialIds, materialId],
+    }));
   };
 
   const highlightText = (text: string, highlights?: { field: string; start: number; end: number }[], fieldName?: string) => {
@@ -319,6 +351,46 @@ export default function AnnotationsPage() {
             />
             <div />
           </div>
+          <div>
+            <div style={{ color: '#888', fontSize: 13, marginBottom: 6 }}>📁 关联素材（可选）</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {materials.length === 0 && <span style={{ color: '#555', fontSize: 12 }}>暂无素材</span>}
+              {materials.map((m) => (
+                <label
+                  key={m.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 10px',
+                    background: form.materialIds.includes(m.id) ? 'rgba(52, 152, 219, 0.2)' : '#222',
+                    border: `1px solid ${form.materialIds.includes(m.id) ? '#3498db' : '#444'}`,
+                    borderRadius: 16,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    color: '#e0e0e0',
+                    maxWidth: 240,
+                  }}
+                  title={m.originalName}
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.materialIds.includes(m.id)}
+                    onChange={() => toggleMaterial(m.id)}
+                    style={{ accentColor: '#3498db' }}
+                  />
+                  <span style={{
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 200,
+                  }}>
+                    {m.originalName}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
           <div style={{ textAlign: 'right' }}>
             <button type="submit" style={primaryBtnStyle}>
               创建
@@ -377,6 +449,46 @@ export default function AnnotationsPage() {
                     style={inputStyle}
                   />
                   <div />
+                </div>
+                <div>
+                  <div style={{ color: '#888', fontSize: 13, marginBottom: 6 }}>📁 关联素材（可选）</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {materials.length === 0 && <span style={{ color: '#555', fontSize: 12 }}>暂无素材</span>}
+                    {materials.map((m) => (
+                      <label
+                        key={m.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '4px 10px',
+                          background: form.materialIds.includes(m.id) ? 'rgba(52, 152, 219, 0.2)' : '#222',
+                          border: `1px solid ${form.materialIds.includes(m.id) ? '#3498db' : '#444'}`,
+                          borderRadius: 16,
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          color: '#e0e0e0',
+                          maxWidth: 240,
+                        }}
+                        title={m.originalName}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.materialIds.includes(m.id)}
+                          onChange={() => toggleMaterial(m.id)}
+                          style={{ accentColor: '#3498db' }}
+                        />
+                        <span style={{
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: 200,
+                        }}>
+                          {m.originalName}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button type="button" onClick={handleCancelEdit} style={secondaryBtnStyle}>
@@ -447,6 +559,24 @@ export default function AnnotationsPage() {
                           }}
                         >
                           定位: {a.startOffset ?? '-'} - {a.endOffset ?? '-'}
+                        </span>
+                      )}
+                      {a.materialIds && a.materialIds.length > 0 && (
+                        <span
+                          style={{
+                            background: 'rgba(52, 152, 219, 0.1)',
+                            color: '#3498db',
+                            padding: '2px 8px',
+                            borderRadius: 10,
+                            fontSize: 11,
+                            border: '1px solid rgba(52, 152, 219, 0.3)',
+                          }}
+                          title={a.materialIds.map((mid) => {
+                            const m = materials.find((x) => x.id === mid);
+                            return m ? m.originalName : `素材#${mid}`;
+                          }).join('、')}
+                        >
+                          📁 {a.materialIds.length} 个素材
                         </span>
                       )}
                       <span style={{ fontSize: 11, color: '#555' }}>

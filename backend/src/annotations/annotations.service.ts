@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Annotation, AnnotationVersion, VersionAction, UserRole } from '../entities';
+import { Repository, In } from 'typeorm';
+import { Annotation, AnnotationVersion, VersionAction, UserRole, Material } from '../entities';
 
 @Injectable()
 export class AnnotationsService {
@@ -10,6 +10,8 @@ export class AnnotationsService {
     private repo: Repository<Annotation>,
     @InjectRepository(AnnotationVersion)
     private versionRepo: Repository<AnnotationVersion>,
+    @InjectRepository(Material)
+    private materialRepo: Repository<Material>,
   ) {}
 
   private async createVersion(
@@ -39,8 +41,21 @@ export class AnnotationsService {
     return annotation.createdBy === userId;
   }
 
+  private async validateMaterialIds(materialIds: number[]): Promise<number[]> {
+    const uniqueIds = Array.from(new Set(materialIds));
+    if (uniqueIds.length === 0) return uniqueIds;
+    const materials = await this.materialRepo.findBy({ id: In(uniqueIds) });
+    if (materials.length !== uniqueIds.length) {
+      const foundIds = materials.map((m) => m.id);
+      const missingIds = uniqueIds.filter((id) => !foundIds.includes(id));
+      throw new BadRequestException(`素材ID不存在: ${missingIds.join(', ')}`);
+    }
+    return uniqueIds;
+  }
+
   async create(data: Partial<Annotation>, userId: number) {
-    const item = this.repo.create(data);
+    const materialIds = data.materialIds ? await this.validateMaterialIds(data.materialIds) : [];
+    const item = this.repo.create({ ...data, materialIds });
     const saved = await this.repo.save(item);
     await this.createVersion(saved, VersionAction.CREATE, userId);
     return saved;
@@ -80,8 +95,13 @@ export class AnnotationsService {
       throw new ForbiddenException('无权修改此批注');
     }
 
+    let materialIds = annotation.materialIds ?? [];
+    if (data.materialIds !== undefined) {
+      materialIds = await this.validateMaterialIds(data.materialIds);
+    }
+
     await this.createVersion(annotation, VersionAction.UPDATE, userId);
-    await this.repo.update(id, data);
+    await this.repo.update(id, { ...data, materialIds });
     return this.repo.findOne({ where: { id } });
   }
 

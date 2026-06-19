@@ -10,6 +10,7 @@ interface Rehearsal {
   endTime: string;
   location: string;
   participantIds: number[];
+  materialIds?: number[];
   hasConflict?: boolean;
   timeConflicts?: Rehearsal[];
   participantConflicts?: Array<{
@@ -40,6 +41,14 @@ interface Rehearsal {
   effectiveParticipants?: number[];
 }
 
+interface MaterialLite {
+  id: number;
+  originalName: string;
+  category?: string;
+  categories?: string[];
+  tags?: string[];
+}
+
 interface User {
   id: number;
   username: string;
@@ -64,6 +73,7 @@ const emptyForm = {
   endTime: '',
   location: '',
   participantIds: [] as number[],
+  materialIds: [] as number[],
 };
 
 function formatLocalInput(d: string | Date): string {
@@ -91,6 +101,7 @@ const emptyFilters: Filters = {
 export default function CalendarPage() {
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [materials, setMaterials] = useState<MaterialLite[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -198,9 +209,19 @@ export default function CalendarPage() {
     }
   };
 
+  const loadMaterials = async () => {
+    try {
+      const data = await api.materials.list();
+      setMaterials(data);
+    } catch (e) {
+      console.error('加载素材列表失败', e);
+    }
+  };
+
   useEffect(() => {
     load();
     loadUsers();
+    loadMaterials();
   }, []);
 
   useEffect(() => {
@@ -240,6 +261,7 @@ export default function CalendarPage() {
       endTime: formatLocalInput(r.endTime),
       location: r.location || '',
       participantIds: r.participantIds || [],
+      materialIds: r.materialIds || [],
     });
     setShowForm(true);
     setError(null);
@@ -260,6 +282,15 @@ export default function CalendarPage() {
       participantIds: prev.participantIds.includes(userId)
         ? prev.participantIds.filter((id) => id !== userId)
         : [...prev.participantIds, userId],
+    }));
+  };
+
+  const toggleMaterial = (materialId: number) => {
+    setForm((prev) => ({
+      ...prev,
+      materialIds: prev.materialIds.includes(materialId)
+        ? prev.materialIds.filter((id) => id !== materialId)
+        : [...prev.materialIds, materialId],
     }));
   };
 
@@ -495,6 +526,47 @@ export default function CalendarPage() {
                   />
                   {u.displayName || u.username}
                   <span style={{ color: '#666', fontSize: 11 }}>({u.role})</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ color: '#888', fontSize: 13, marginBottom: 6 }}>📁 关联素材（可选）</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {materials.length === 0 && <span style={{ color: '#555', fontSize: 12 }}>暂无素材，请先到素材库上传</span>}
+              {materials.map((m) => (
+                <label
+                  key={m.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 12px',
+                    background: form.materialIds.includes(m.id) ? 'rgba(52, 152, 219, 0.2)' : '#222',
+                    border: `1px solid ${form.materialIds.includes(m.id) ? '#3498db' : '#444'}`,
+                    borderRadius: 20,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    color: '#e0e0e0',
+                    maxWidth: 260,
+                  }}
+                  title={m.originalName}
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.materialIds.includes(m.id)}
+                    onChange={() => toggleMaterial(m.id)}
+                    style={{ accentColor: '#3498db' }}
+                  />
+                  <span style={{
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 220,
+                  }}>
+                    {m.originalName}
+                  </span>
                 </label>
               ))}
             </div>
@@ -760,6 +832,36 @@ export default function CalendarPage() {
                   </div>
                 )}
                 {r.description && <p style={{ fontSize: 13, color: '#666', margin: '6px 0 0' }}>{r.description}</p>}
+
+                {r.materialIds && r.materialIds.length > 0 && (
+                  <div style={{ marginTop: 8, fontSize: 12 }}>
+                    <div style={{ color: '#888', marginBottom: 4 }}>
+                      📁 关联素材 ({r.materialIds.length})
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {r.materialIds.map((mid) => {
+                        const m = materials.find((x) => x.id === mid);
+                        return (
+                          <span
+                            key={mid}
+                            style={{
+                              padding: '2px 8px',
+                              background: 'rgba(52, 152, 219, 0.1)',
+                              border: '1px solid rgba(52, 152, 219, 0.3)',
+                              color: '#3498db',
+                              borderRadius: 10,
+                              fontSize: 11,
+                            }}
+                            title={m?.originalName}
+                          >
+                            {m ? m.originalName.slice(0, 20) + (m.originalName.length > 20 ? '...' : '') : `素材#${mid}`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {r.hasConflict && r.participantConflicts && r.participantConflicts.length > 0 && (
                   <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 8, padding: '6px 10px', background: 'rgba(231, 76, 60, 0.08)', borderRadius: 4 }}>
                     冲突详情：{r.participantConflicts.map((p) => `${p.userName || '用户#' + p.userId}在${p.conflictingRehearsals.map((x) => x.title).join('、')}有安排`).join('；')}

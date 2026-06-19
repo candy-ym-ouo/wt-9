@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, Not } from 'typeorm';
-import { Rehearsal, User, CastRole, LeaveRequest, LeaveStatus } from '../entities';
+import { Repository, Between, Not, In } from 'typeorm';
+import { Rehearsal, User, CastRole, LeaveRequest, LeaveStatus, Material } from '../entities';
 import { LeavesService } from '../leaves/leaves.service';
 
 export interface ConflictInfo {
@@ -64,6 +64,8 @@ export class RehearsalsService {
     private userRepo: Repository<User>,
     @InjectRepository(CastRole)
     private roleRepo: Repository<CastRole>,
+    @InjectRepository(Material)
+    private materialRepo: Repository<Material>,
     private leavesService: LeavesService,
   ) {}
 
@@ -135,7 +137,18 @@ export class RehearsalsService {
       throw new BadRequestException('结束时间必须晚于开始时间');
     }
 
-    const item = this.repo.create(data);
+    const materialIds = data.materialIds || [];
+    if (materialIds.length > 0) {
+      const uniqueIds = Array.from(new Set(materialIds));
+      const materials = await this.materialRepo.findBy({ id: In(uniqueIds) });
+      if (materials.length !== uniqueIds.length) {
+        const foundIds = materials.map((m) => m.id);
+        const missingIds = uniqueIds.filter((id) => !foundIds.includes(id));
+        throw new BadRequestException(`素材ID不存在: ${missingIds.join(', ')}`);
+      }
+    }
+
+    const item = this.repo.create({ ...data, materialIds });
     return this.repo.save(item);
   }
 
@@ -260,11 +273,26 @@ export class RehearsalsService {
 
     const participantIds = data.participantIds ?? existing.participantIds ?? [];
 
+    let materialIds = existing.materialIds ?? [];
+    if (data.materialIds !== undefined) {
+      const uniqueIds = Array.from(new Set(data.materialIds));
+      if (uniqueIds.length > 0) {
+        const materials = await this.materialRepo.findBy({ id: In(uniqueIds) });
+        if (materials.length !== uniqueIds.length) {
+          const foundIds = materials.map((m) => m.id);
+          const missingIds = uniqueIds.filter((mid) => !foundIds.includes(mid));
+          throw new BadRequestException(`素材ID不存在: ${missingIds.join(', ')}`);
+        }
+      }
+      materialIds = uniqueIds;
+    }
+
     await this.repo.update(id, {
       ...data,
       startTime,
       endTime,
       participantIds,
+      materialIds,
     });
     return this.repo.findOne({ where: { id } });
   }
