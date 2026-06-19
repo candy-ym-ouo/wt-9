@@ -18,6 +18,11 @@ export class AnnotationsController {
     return this.service.findAll();
   }
 
+  @Get('grouped/by-scene')
+  findGroupedByScene(@Query('search') search?: string) {
+    return this.service.findGroupedByScene(search);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: number) {
     return this.service.findOne(id);

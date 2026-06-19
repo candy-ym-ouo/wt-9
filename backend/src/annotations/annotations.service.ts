@@ -71,6 +71,42 @@ export class AnnotationsService {
     return this.repo.find({ where: { sceneNumber }, order: { createdAt: 'DESC' } });
   }
 
+  async findGroupedByScene(searchQuery?: string) {
+    const all = await this.repo.find({ order: { sceneNumber: 'ASC', createdAt: 'DESC' } });
+
+    const filtered = searchQuery && searchQuery.trim()
+      ? this.searchInScript(searchQuery.trim(), all)
+      : all.map((a) => ({ ...a, highlights: [] as any[] }));
+
+    const grouped: Record<string, any[]> = {};
+    const noSceneKey = '__nosence__';
+
+    for (const a of filtered) {
+      const key = a.sceneNumber != null ? String(a.sceneNumber) : noSceneKey;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(a);
+    }
+
+    const result = Object.entries(grouped)
+      .map(([key, items]) => ({
+        sceneNumber: key === noSceneKey ? null : Number(key),
+        sceneLabel: key === noSceneKey ? '未指定场次' : `第${key}场`,
+        count: items.length,
+        annotations: items,
+      }))
+      .sort((a, b) => {
+        if (a.sceneNumber == null) return 1;
+        if (b.sceneNumber == null) return -1;
+        return a.sceneNumber - b.sceneNumber;
+      });
+
+    return {
+      groups: result,
+      totalCount: filtered.length,
+      sceneCount: result.length,
+    };
+  }
+
   async findOne(id: number) {
     return this.repo.findOne({ where: { id } });
   }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 interface SearchResult {
@@ -76,6 +77,7 @@ function highlightSearchResult(
 }
 
 export default function SearchPage() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -637,46 +639,94 @@ export default function SearchPage() {
                 <section style={{ marginBottom: 24 }}>
                   <h3 style={{ color: '#2ecc71', fontSize: 15, marginBottom: 12 }}>📝 批注 ({results.annotations.length})</h3>
                   {results.annotations.map((a: any) => (
-                    <div key={a.id} style={cardStyle}>
-                      <div style={{ fontStyle: 'italic', color: '#e0e0e0', fontSize: 14 }}>
-                        {highlightSearchResult(a.scriptContent, a.highlights, 'scriptContent')}
-                      </div>
-                      {a.note && (
-                        <div style={{ fontSize: 13, color: '#aaa', marginTop: 4 }}>
-                          → {highlightSearchResult(a.note, a.highlights, 'note')}
+                    <div
+                      key={a.id}
+                      style={{
+                        ...cardStyle,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        border: '1px solid #333',
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.borderColor = '#2ecc71';
+                        (e.currentTarget as HTMLDivElement).style.background = '#1e2a1e';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.borderColor = '#333';
+                        (e.currentTarget as HTMLDivElement).style.background = '#1a1a1a';
+                      }}
+                      onClick={() => {
+                        const params: Record<string, string> = { annotationId: String(a.id) };
+                        if (a.sceneNumber) params.scene = String(a.sceneNumber);
+                        if (query) params.q = query;
+                        navigate({ pathname: '/annotations', search: new URLSearchParams(params).toString() });
+                      }}
+                      title="点击跳转到批注页面查看详情"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontStyle: 'italic', color: '#e0e0e0', fontSize: 14 }}>
+                            {highlightSearchResult(a.scriptContent, a.highlights, 'scriptContent')}
+                          </div>
+                          {a.note && (
+                            <div style={{ fontSize: 13, color: '#aaa', marginTop: 4 }}>
+                              → {highlightSearchResult(a.note, a.highlights, 'note')}
+                            </div>
+                          )}
+                          <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {a.tag && (
+                              <span
+                                style={{
+                                  background: '#333',
+                                  color: '#aaa',
+                                  padding: '2px 6px',
+                                  borderRadius: 8,
+                                  fontSize: 11,
+                                  display: 'inline-block',
+                                }}
+                              >
+                                🏷️ {a.tag}
+                              </span>
+                            )}
+                            {a.sceneNumber && (
+                              <span
+                                style={{
+                                  background: 'rgba(52,152,219,0.15)',
+                                  color: '#3498db',
+                                  padding: '2px 6px',
+                                  borderRadius: 8,
+                                  fontSize: 11,
+                                  display: 'inline-block',
+                                  border: '1px solid rgba(52,152,219,0.3)',
+                                }}
+                              >
+                                🎬 第{a.sceneNumber}场
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      {a.tag && (
-                        <span
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const params: Record<string, string> = { annotationId: String(a.id) };
+                            if (a.sceneNumber) params.scene = String(a.sceneNumber);
+                            if (query) params.q = query;
+                            navigate({ pathname: '/annotations', search: new URLSearchParams(params).toString() });
+                          }}
                           style={{
-                            background: '#333',
-                            color: '#aaa',
-                            padding: '2px 6px',
-                            borderRadius: 8,
+                            padding: '4px 10px',
+                            background: 'rgba(46,204,113,0.1)',
+                            border: '1px solid #2ecc71',
+                            borderRadius: 4,
+                            color: '#2ecc71',
                             fontSize: 11,
-                            marginTop: 4,
-                            display: 'inline-block',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
                           }}
                         >
-                          {a.tag}
-                        </span>
-                      )}
-                      {a.sceneNumber && (
-                        <span
-                          style={{
-                            background: '#2a2a2a',
-                            color: '#888',
-                            padding: '2px 6px',
-                            borderRadius: 8,
-                            fontSize: 11,
-                            marginLeft: 6,
-                            marginTop: 4,
-                            display: 'inline-block',
-                          }}
-                        >
-                          第{a.sceneNumber}场
-                        </span>
-                      )}
+                          跳转 →
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </section>
@@ -739,13 +789,32 @@ export default function SearchPage() {
               <div>
                 {results.flatResults.map((item: any, index: number) => {
                   const moduleInfo = getModuleInfo(item.type);
+                  const isAnnotation = item.type === 'annotation';
+                  const handleJump = () => {
+                    if (isAnnotation) {
+                      const params: Record<string, string> = { annotationId: String(item.id) };
+                      if (item.raw?.sceneNumber) params.scene = String(item.raw.sceneNumber);
+                      if (query) params.q = query;
+                      navigate({ pathname: '/annotations', search: new URLSearchParams(params).toString() });
+                    }
+                  };
                   return (
                     <div
                       key={`${item.type}-${item.id}`}
                       style={{
                         ...cardStyle,
                         borderLeft: `4px solid ${moduleInfo?.color || '#666'}`,
+                        cursor: isAnnotation ? 'pointer' : 'default',
+                        transition: 'all 0.2s',
                       }}
+                      onClick={isAnnotation ? handleJump : undefined}
+                      onMouseEnter={isAnnotation ? (e) => {
+                        (e.currentTarget as HTMLDivElement).style.background = '#1e2a1e';
+                      } : undefined}
+                      onMouseLeave={isAnnotation ? (e) => {
+                        (e.currentTarget as HTMLDivElement).style.background = '#1a1a1a';
+                      } : undefined}
+                      title={isAnnotation ? '点击跳转到批注页面查看详情' : undefined}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <span style={{ fontSize: 16 }}>{moduleInfo?.icon || '📄'}</span>
@@ -761,12 +830,45 @@ export default function SearchPage() {
                         }}>
                           {moduleInfo?.label || item.type}
                         </span>
+                        {isAnnotation && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleJump(); }}
+                            style={{
+                              padding: '3px 10px',
+                              background: 'rgba(46,204,113,0.1)',
+                              border: '1px solid #2ecc71',
+                              borderRadius: 4,
+                              color: '#2ecc71',
+                              fontSize: 11,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            跳转 →
+                          </button>
+                        )}
                       </div>
                       {item.description && (
                         <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>
-                          {item.description.length > 150
+                          {item.description && item.description.length > 150
                             ? item.description.substring(0, 150) + '...'
                             : item.description}
+                        </div>
+                      )}
+                      {isAnnotation && item.raw?.sceneNumber && (
+                        <div style={{ marginTop: 6 }}>
+                          <span
+                            style={{
+                              background: 'rgba(52,152,219,0.15)',
+                              color: '#3498db',
+                              padding: '2px 6px',
+                              borderRadius: 8,
+                              fontSize: 11,
+                              display: 'inline-block',
+                              border: '1px solid rgba(52,152,219,0.3)',
+                            }}
+                          >
+                            🎬 第{item.raw.sceneNumber}场
+                          </span>
                         </div>
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12, color: '#666' }}>
@@ -774,19 +876,19 @@ export default function SearchPage() {
                         {item.tags && item.tags.length > 0 && (
                           <div style={{ display: 'flex', gap: 4 }}>
                             {item.tags.map((t: string, i: number) => (
-                          <span
-                            key={i}
-                            style={{
-                              background: '#2a2a2a',
-                              color: '#888',
-                              padding: '1px 6px',
-                              borderRadius: 6,
-                              fontSize: 11,
-                            }}
-                          >
-                            🏷️ {t}
-                          </span>
-                        ))}
+                              <span
+                                key={i}
+                                style={{
+                                  background: '#2a2a2a',
+                                  color: '#888',
+                                  padding: '1px 6px',
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                }}
+                              >
+                                🏷️ {t}
+                              </span>
+                            ))}
                           </div>
                         )}
                       </div>

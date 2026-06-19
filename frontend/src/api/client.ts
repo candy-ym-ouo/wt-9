@@ -132,6 +132,10 @@ export const api = {
       const params = scene ? `?scene=${scene}` : '';
       return request<any[]>(`/annotations${params}`);
     },
+    listGroupedByScene: (search?: string) => {
+      const params = search ? `?search=${encodeURIComponent(search)}` : '';
+      return request<any>(`/annotations/grouped/by-scene${params}`);
+    },
     get: (id: number) => request<any>(`/annotations/${id}`),
     create: (data: any) =>
       request<any>('/annotations', { method: 'POST', body: JSON.stringify(data) }),
