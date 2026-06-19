@@ -198,14 +198,36 @@ export class RehearsalsService {
       }
     }
 
-    if (filters.attendanceStatus && filters.participantId) {
-      const pid = parseInt(filters.participantId, 10);
-      if (!isNaN(pid)) {
-        result = result.filter((r) => {
-          const attendance = r.attendance?.[pid];
-          return attendance?.status === filters.attendanceStatus;
-        });
-      }
+    if (filters.attendanceStatus) {
+      const status = filters.attendanceStatus;
+      const pid = filters.participantId ? parseInt(filters.participantId, 10) : null;
+
+      result = result.filter((r) => {
+        const attendance = r.attendance || {};
+        const participantIds = r.participantIds || [];
+
+        if (pid !== null && !isNaN(pid)) {
+          if (!participantIds.includes(pid)) return false;
+          const userAttendance = attendance[String(pid)] || attendance[pid];
+          const userStatus = userAttendance?.status || null;
+
+          if (status === 'pending') {
+            return userStatus === null || userStatus === undefined;
+          }
+          return userStatus === status;
+        } else {
+          const hasMatch = participantIds.some((userId) => {
+            const userAttendance = attendance[String(userId)] || attendance[userId];
+            const userStatus = userAttendance?.status || null;
+
+            if (status === 'pending') {
+              return userStatus === null || userStatus === undefined;
+            }
+            return userStatus === status;
+          });
+          return hasMatch;
+        }
+      });
     }
 
     return result;
@@ -299,7 +321,7 @@ export class RehearsalsService {
       const user = userMap.get(userId);
       const leave = activeLeaves.find((l) => l.actorId === userId);
       const role = roleByActor.get(userId);
-      const userAttendance = attendance[userId];
+      const userAttendance = attendance[String(userId)] || attendance[userId];
 
       let substituteId: number | undefined;
       let substituteName: string | undefined;
@@ -384,18 +406,20 @@ export class RehearsalsService {
     }
 
     const currentAttendance = existing.attendance || {};
-    const newAttendance = { ...currentAttendance };
+    const newAttendance: Record<string, any> = { ...currentAttendance };
 
     for (const update of updates) {
       if (!existing.participantIds?.includes(update.userId)) {
         continue;
       }
-      newAttendance[update.userId] = {
+      const key = String(update.userId);
+      const existingRecord = currentAttendance[key] || currentAttendance[update.userId];
+      newAttendance[key] = {
         status: update.status,
         absentReason: update.absentReason,
         checkInTime: update.status === 'present' || update.status === 'late'
           ? new Date().toISOString()
-          : undefined,
+          : existingRecord?.checkInTime,
       };
     }
 
@@ -439,7 +463,8 @@ export class RehearsalsService {
 
       for (const userId of participantIds) {
         totalParticipants++;
-        const status = attendance[userId]?.status;
+        const userAttendance = attendance[String(userId)] || attendance[userId];
+        const status = userAttendance?.status;
 
         if (status === 'present') {
           presentCount++;

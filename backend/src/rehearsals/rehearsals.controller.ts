@@ -31,9 +31,14 @@ export class RehearsalsController {
     return withConflicts.map((r, i) => ({ ...r, ...withParticipants[i] }));
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: number) {
-    return this.service.findOneWithDetails(id);
+  @Get('statistics/summary')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  getStatistics(
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+  ) {
+    return this.service.getStatistics(start, end);
   }
 
   @Post('check-conflicts')
@@ -84,6 +89,11 @@ export class RehearsalsController {
     }
   }
 
+  @Get(':id')
+  findOne(@Param('id') id: number) {
+    return this.service.findOneWithDetails(id);
+  }
+
   @Put(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
@@ -109,13 +119,6 @@ export class RehearsalsController {
     }
   }
 
-  @Delete(':id')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  remove(@Param('id') id: number) {
-    return this.service.remove(id);
-  }
-
   @Put(':id/attendance')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
@@ -133,13 +136,10 @@ export class RehearsalsController {
     return this.service.updateAttendance(id, body.updates);
   }
 
-  @Get('statistics/summary')
+  @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  getStatistics(
-    @Query('start') start?: string,
-    @Query('end') end?: string,
-  ) {
-    return this.service.getStatistics(start, end);
+  remove(@Param('id') id: number) {
+    return this.service.remove(id);
   }
 }

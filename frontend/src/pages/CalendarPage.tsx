@@ -111,7 +111,7 @@ export default function CalendarPage() {
     if (filters.timeSlotStart && filters.timeSlotEnd) {
       params.timeSlot = `${filters.timeSlotStart}-${filters.timeSlotEnd}`;
     }
-    if (filters.attendanceStatus && filters.participantId) {
+    if (filters.attendanceStatus) {
       params.attendanceStatus = filters.attendanceStatus;
     }
     const data = await api.rehearsals.list(params);
@@ -397,6 +397,7 @@ export default function CalendarPage() {
                 <option value="present">出勤</option>
                 <option value="absent">缺席</option>
                 <option value="late">迟到</option>
+                <option value="pending">未签到</option>
               </select>
             </div>
             <div>
@@ -422,7 +423,7 @@ export default function CalendarPage() {
             <div style={{ color: '#666', fontSize: 13 }}>
               当前筛选结果：<span style={{ color: '#3498db' }}>{rehearsals.length}</span> 条排练
               {filters.attendanceStatus && !filters.participantId && (
-                <span style={{ color: '#e67e22', marginLeft: 8 }}>⚠️ 请先选择演员再按签到状态筛选</span>
+                <span style={{ color: '#95a5a6', marginLeft: 8 }}>（全局搜索：含任意匹配的参与者）</span>
               )}
             </div>
             {hasActiveFilters && (
