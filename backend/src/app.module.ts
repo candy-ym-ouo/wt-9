@@ -17,6 +17,10 @@ import {
   ScriptChapter,
   ScriptScene,
   ScriptVersion,
+  ActorProfile,
+  RehearsalAvailability,
+  RehearsalAvailabilityException,
+  HistoricalRole,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -31,6 +35,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PerformancesModule } from './performances/performances.module';
 import { ScriptsModule } from './scripts/scripts.module';
+import { ActorProfilesModule } from './actor-profiles/actor-profiles.module';
 
 @Module({
   imports: [
@@ -54,6 +59,10 @@ import { ScriptsModule } from './scripts/scripts.module';
         ScriptChapter,
         ScriptScene,
         ScriptVersion,
+        ActorProfile,
+        RehearsalAvailability,
+        RehearsalAvailabilityException,
+        HistoricalRole,
       ],
       synchronize: true,
     }),
@@ -70,6 +79,7 @@ import { ScriptsModule } from './scripts/scripts.module';
     DashboardModule,
     PerformancesModule,
     ScriptsModule,
+    ActorProfilesModule,
   ],
 })
 export class AppModule {}

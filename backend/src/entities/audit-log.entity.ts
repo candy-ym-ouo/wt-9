@@ -37,6 +37,15 @@ export enum AuditAction {
   UPDATE_SCRIPT_CHAPTER = 'update_script_chapter',
   UPDATE_SCRIPT_SCENE = 'update_script_scene',
   REPARSE_SCRIPT = 'reparse_script',
+  CREATE_ACTOR_PROFILE = 'create_actor_profile',
+  UPDATE_ACTOR_PROFILE = 'update_actor_profile',
+  DELETE_ACTOR_PROFILE = 'delete_actor_profile',
+  UPDATE_ACTOR_AVAILABILITY = 'update_actor_availability',
+  CREATE_HISTORICAL_ROLE = 'create_historical_role',
+  UPDATE_HISTORICAL_ROLE = 'update_historical_role',
+  DELETE_HISTORICAL_ROLE = 'delete_historical_role',
+  BIND_ACTOR_MATERIAL = 'bind_actor_material',
+  UNBIND_ACTOR_MATERIAL = 'unbind_actor_material',
 }
 
 export enum AuditModule {
@@ -46,6 +55,7 @@ export enum AuditModule {
   REHEARSAL = 'rehearsal',
   PERFORMANCE = 'performance',
   SCRIPT = 'script',
+  ACTOR_PROFILE = 'actor_profile',
 }
 
 @Entity('audit_logs')

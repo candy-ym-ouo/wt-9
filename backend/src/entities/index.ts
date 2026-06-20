@@ -13,3 +13,6 @@ export { Script, ScriptStatus, ScriptFormat } from './script.entity';
 export { ScriptChapter } from './script-chapter.entity';
 export { ScriptScene, SceneTimeOfDay, SceneLocationType } from './script-scene.entity';
 export { ScriptVersion, ScriptVersionAction } from './script-version.entity';
+export { ActorProfile, ActorGender, ActorStatus } from './actor-profile.entity';
+export { RehearsalAvailability, RehearsalAvailabilityException, Weekday, AvailabilityType } from './rehearsal-availability.entity';
+export { HistoricalRole, HistoricalRoleStatus } from './historical-role.entity';
