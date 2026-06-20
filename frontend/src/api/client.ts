@@ -475,4 +475,40 @@ export const api = {
     restoreVersion: (scriptId: number, versionId: number) =>
       request<any>(`/scripts/${scriptId}/versions/${versionId}/restore`, { method: 'POST' }),
   },
+  dramas: {
+    list: (status?: string) => {
+      const q = status ? `?status=${status}` : '';
+      return request<any[]>(`/dramas${q}`);
+    },
+    search: (q: string) => request<any[]>(`/dramas/search?q=${encodeURIComponent(q)}`),
+    get: (id: number) => request<any>(`/dramas/${id}`),
+    getStats: (id: number) => request<any>(`/dramas/${id}/stats`),
+    getPermissions: (id: number) => request<any[]>(`/dramas/${id}/permissions`),
+    create: (data: {
+      title: string;
+      description?: string;
+      synopsis?: string;
+      genres?: string[];
+      premiereDate?: string;
+      finalDate?: string;
+      venue?: string;
+      status?: string;
+      tags?: string[];
+    }) => request<any>('/dramas', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) =>
+      request<any>(`/dramas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => request<any>(`/dramas/${id}`, { method: 'DELETE' }),
+    grantPermission: (dramaId: number, userId: number, role: string) =>
+      request<any>(`/dramas/${dramaId}/permissions`, {
+        method: 'POST',
+        body: JSON.stringify({ userId, role }),
+      }),
+    updatePermission: (dramaId: number, userId: number, role: string) =>
+      request<any>(`/dramas/${dramaId}/permissions/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ role }),
+      }),
+    revokePermission: (dramaId: number, userId: number) =>
+      request<any>(`/dramas/${dramaId}/permissions/${userId}`, { method: 'DELETE' }),
+  },
 };

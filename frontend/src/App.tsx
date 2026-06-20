@@ -16,6 +16,7 @@ import AuditLogsPage from './pages/AuditLogsPage';
 import ScriptsPage from './pages/ScriptsPage';
 import ScriptDetailPage from './pages/ScriptDetailPage';
 import ReportsPage from './pages/ReportsPage';
+import DramasPage from './pages/DramasPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -35,6 +36,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/reminders" /> : <LoginPage />} />
+      <Route path="/dramas" element={<ProtectedRoute><DramasPage /></ProtectedRoute>} />
       <Route path="/reminders" element={<ProtectedRoute><RemindersPage /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
       <Route path="/performances" element={<ProtectedRoute><PerformancesPage /></ProtectedRoute>} />

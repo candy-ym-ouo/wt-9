@@ -1,9 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { DramasService } from './dramas.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { Drama, DramaStatus, DramaRole, UserRole } from '../entities';
+import { Drama, DramaStatus, DramaRole } from '../entities';
 
 @Controller('dramas')
 @UseGuards(JwtAuthGuard)
@@ -73,8 +71,6 @@ export class DramasController {
   }
 
   @Post(':id/permissions')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   grantPermission(
     @Param('id') dramaId: number,
     @Body() body: { userId: number; role: DramaRole },
@@ -90,8 +86,6 @@ export class DramasController {
   }
 
   @Put(':id/permissions/:userId')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   updatePermission(
     @Param('id') dramaId: number,
     @Param('userId') userId: number,
@@ -108,8 +102,6 @@ export class DramasController {
   }
 
   @Delete(':id/permissions/:userId')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   revokePermission(
     @Param('id') dramaId: number,
     @Param('userId') userId: number,

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 
 const NAV_ITEMS = [
+  { path: '/dramas', label: '剧目管理', icon: '🎬' },
   { path: '/reminders', label: '排练提醒', icon: '🔔' },
   { path: '/calendar', label: '排练日历', icon: '📅' },
   { path: '/performances', label: '演出场次', icon: '🎪' },
