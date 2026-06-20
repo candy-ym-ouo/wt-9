@@ -5,9 +5,15 @@ import { RehearsalsService } from './rehearsals.service';
 import { RehearsalsController } from './rehearsals.controller';
 import { LeavesModule } from '../leaves/leaves.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Rehearsal, User, CastRole, LeaveRequest, Material]), LeavesModule, AuditLogsModule],
+  imports: [
+    TypeOrmModule.forFeature([Rehearsal, User, CastRole, LeaveRequest, Material]),
+    LeavesModule,
+    AuditLogsModule,
+    NotificationsModule,
+  ],
   providers: [RehearsalsService],
   controllers: [RehearsalsController],
   exports: [RehearsalsService],

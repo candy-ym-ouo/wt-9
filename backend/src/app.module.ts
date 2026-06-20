@@ -11,6 +11,7 @@ import {
   LeaveRequest,
   Reminder,
   ReminderConfig,
+  Notification,
   AuditLog,
   Performance,
   Script,
@@ -31,6 +32,7 @@ import { MaterialsModule } from './materials/materials.module';
 import { SearchModule } from './search/search.module';
 import { LeavesModule } from './leaves/leaves.module';
 import { RemindersModule } from './reminders/reminders.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PerformancesModule } from './performances/performances.module';
@@ -53,6 +55,7 @@ import { ActorProfilesModule } from './actor-profiles/actor-profiles.module';
         LeaveRequest,
         Reminder,
         ReminderConfig,
+        Notification,
         AuditLog,
         Performance,
         Script,
@@ -75,6 +78,7 @@ import { ActorProfilesModule } from './actor-profiles/actor-profiles.module';
     SearchModule,
     LeavesModule,
     RemindersModule,
+    NotificationsModule,
     AuditLogsModule,
     DashboardModule,
     PerformancesModule,

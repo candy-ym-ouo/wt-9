@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Material, Rehearsal, Annotation, AuditAction, AuditModule } from '../entities';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { extname, join } from 'path';
 import { unlinkSync, existsSync } from 'fs';
 
@@ -35,6 +36,7 @@ export class MaterialsService {
     @InjectRepository(Annotation)
     private annotationRepo: Repository<Annotation>,
     private auditLogsService: AuditLogsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async checkDuplicate(filename: string): Promise<DuplicateCheckResult> {
@@ -127,6 +129,12 @@ export class MaterialsService {
           version: saved.version,
         },
       });
+
+      this.notificationsService.notifyMaterialUpdate(
+        saved.id,
+        'created',
+        operatorId,
+      ).catch(() => {});
     }
 
     return saved;
@@ -176,6 +184,12 @@ export class MaterialsService {
           version: saved.version,
         },
       });
+
+      this.notificationsService.notifyMaterialUpdate(
+        saved.id,
+        'new_version',
+        operatorId,
+      ).catch(() => {});
     }
 
     return saved;
@@ -232,6 +246,12 @@ export class MaterialsService {
           newStoredName: saved.storedName,
         },
       });
+
+      this.notificationsService.notifyMaterialUpdate(
+        saved.id,
+        'updated',
+        operatorId,
+      ).catch(() => {});
     }
 
     return saved;
@@ -374,6 +394,12 @@ export class MaterialsService {
           : `更新素材「${oldMaterial.originalName}」`,
         metadata: { old: oldMaterial, new: data },
       });
+
+      this.notificationsService.notifyMaterialUpdate(
+        id,
+        'updated',
+        operatorId,
+      ).catch(() => {});
     }
 
     return updated;
@@ -404,6 +430,12 @@ export class MaterialsService {
           categories: material.categories,
         },
       });
+
+      this.notificationsService.notifyMaterialUpdate(
+        id,
+        'deleted',
+        operatorId,
+      ).catch(() => {});
     }
 
     return this.repo.delete(id);

@@ -7,6 +7,7 @@ export { Material } from './material.entity';
 export { LeaveRequest, LeaveStatus, LeaveType } from './leave.entity';
 export { ReminderConfig, ReminderType, ReminderChannel } from './reminder-config.entity';
 export { Reminder, ReminderStatus } from './reminder.entity';
+export { Notification, NotificationType, NotificationStatus, NotificationPriority } from './notification.entity';
 export { AuditLog, AuditAction, AuditModule } from './audit-log.entity';
 export { Performance, PerformanceStatus } from './performance.entity';
 export { Script, ScriptStatus, ScriptFormat } from './script.entity';

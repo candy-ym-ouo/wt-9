@@ -4,6 +4,7 @@ import { Repository, Between, Not, In } from 'typeorm';
 import { Rehearsal, User, CastRole, LeaveRequest, LeaveStatus, Material, AuditAction, AuditModule } from '../entities';
 import { LeavesService } from '../leaves/leaves.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface ConflictInfo {
   hasConflict: boolean;
@@ -70,6 +71,7 @@ export class RehearsalsService {
     private materialRepo: Repository<Material>,
     private leavesService: LeavesService,
     private auditLogsService: AuditLogsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async checkConflicts(
@@ -206,6 +208,13 @@ export class RehearsalsService {
           materialIds: saved.materialIds,
         },
       });
+
+      this.notificationsService.notifyRehearsalChange(
+        saved.id,
+        'created',
+        undefined,
+        operatorId,
+      ).catch(() => {});
     }
 
     return saved;
@@ -399,6 +408,13 @@ export class RehearsalsService {
           : `更新排练「${existing.title}」`,
         metadata: { old: existing, new: data },
       });
+
+      this.notificationsService.notifyRehearsalChange(
+        id,
+        'updated',
+        changes.length > 0 ? changes : undefined,
+        operatorId,
+      ).catch(() => {});
     }
 
     return this.repo.findOne({ where: { id } });
@@ -422,6 +438,13 @@ export class RehearsalsService {
           endTime: rehearsal.endTime,
         },
       });
+
+      this.notificationsService.notifyRehearsalChange(
+        id,
+        'deleted',
+        undefined,
+        operatorId,
+      ).catch(() => {});
     }
     return this.repo.delete(id);
   }

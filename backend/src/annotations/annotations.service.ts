@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Annotation, AnnotationVersion, VersionAction, UserRole, Material } from '../entities';
+import { Annotation, AnnotationVersion, VersionAction, UserRole, Material, User } from '../entities';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AnnotationsService {
@@ -12,6 +13,9 @@ export class AnnotationsService {
     private versionRepo: Repository<AnnotationVersion>,
     @InjectRepository(Material)
     private materialRepo: Repository<Material>,
+    @InjectRepository(User)
+    private userRepo: Repository<User>,
+    private notificationsService: NotificationsService,
   ) {}
 
   private async createVersion(
@@ -59,6 +63,18 @@ export class AnnotationsService {
     const item = this.repo.create({ ...data, materialIds });
     const saved = await this.repo.save(item);
     await this.createVersion(saved, VersionAction.CREATE, userId);
+
+    if (data.note && data.createdBy && data.createdBy !== userId) {
+      const replier = await this.userRepo.findOne({ where: { id: userId } });
+      const replierName = replier?.displayName || replier?.username || `用户#${userId}`;
+      this.notificationsService.notifyAnnotationReply(
+        saved.id,
+        data.note,
+        userId,
+        replierName,
+      ).catch(() => {});
+    }
+
     return saved;
   }
 
@@ -139,6 +155,18 @@ export class AnnotationsService {
 
     await this.createVersion(annotation, VersionAction.UPDATE, userId);
     await this.repo.update(id, { ...data, materialIds });
+
+    if (data.note && annotation.createdBy && annotation.createdBy !== userId) {
+      const replier = await this.userRepo.findOne({ where: { id: userId } });
+      const replierName = replier?.displayName || replier?.username || `用户#${userId}`;
+      this.notificationsService.notifyAnnotationReply(
+        id,
+        data.note,
+        userId,
+        replierName,
+      ).catch(() => {});
+    }
+
     return this.repo.findOne({ where: { id } });
   }
 
