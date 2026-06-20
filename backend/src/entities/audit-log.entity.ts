@@ -70,6 +70,18 @@ export enum AuditAction {
   REJECT_MATERIAL_PURCHASE = 'reject_material_purchase',
   ORDER_MATERIAL_PURCHASE = 'order_material_purchase',
   RECEIVE_MATERIAL_PURCHASE = 'receive_material_purchase',
+  CREATE_REHEARSAL_ROOM = 'create_rehearsal_room',
+  UPDATE_REHEARSAL_ROOM = 'update_rehearsal_room',
+  DELETE_REHEARSAL_ROOM = 'delete_rehearsal_room',
+  CREATE_EQUIPMENT = 'create_equipment',
+  UPDATE_EQUIPMENT = 'update_equipment',
+  DELETE_EQUIPMENT = 'delete_equipment',
+  CREATE_ROOM_RESERVATION = 'create_room_reservation',
+  UPDATE_ROOM_RESERVATION = 'update_room_reservation',
+  DELETE_ROOM_RESERVATION = 'delete_room_reservation',
+  APPROVE_ROOM_RESERVATION = 'approve_room_reservation',
+  REJECT_ROOM_RESERVATION = 'reject_room_reservation',
+  CANCEL_ROOM_RESERVATION = 'cancel_room_reservation',
 }
 
 export enum AuditModule {
@@ -85,6 +97,9 @@ export enum AuditModule {
   EXPENSE_CATEGORY = 'expense_category',
   REIMBURSEMENT = 'reimbursement',
   MATERIAL_PURCHASE = 'material_purchase',
+  REHEARSAL_ROOM = 'rehearsal_room',
+  EQUIPMENT = 'equipment',
+  ROOM_RESERVATION = 'room_reservation',
 }
 
 @Entity('audit_logs')

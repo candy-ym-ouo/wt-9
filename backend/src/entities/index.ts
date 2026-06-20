@@ -21,3 +21,6 @@ export { Task, TaskCategory, TaskStatus, TaskPriority } from './task.entity';
 export { ExpenseCategory } from './expense-category.entity';
 export { Reimbursement, ReimbursementStatus } from './reimbursement.entity';
 export { MaterialPurchase, PurchaseStatus } from './material-purchase.entity';
+export { RehearsalRoom, RoomStatus } from './rehearsal-room.entity';
+export { Equipment, EquipmentStatus } from './equipment.entity';
+export { RoomReservation, ReservationStatus, ReservationPurpose } from './room-reservation.entity';

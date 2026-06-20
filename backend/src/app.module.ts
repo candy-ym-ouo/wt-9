@@ -26,6 +26,9 @@ import {
   ExpenseCategory,
   Reimbursement,
   MaterialPurchase,
+  RehearsalRoom,
+  Equipment,
+  RoomReservation,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -44,6 +47,9 @@ import { ScriptsModule } from './scripts/scripts.module';
 import { ActorProfilesModule } from './actor-profiles/actor-profiles.module';
 import { TasksModule } from './tasks/tasks.module';
 import { BudgetModule } from './budget/budget.module';
+import { RehearsalRoomsModule } from './rehearsal-rooms/rehearsal-rooms.module';
+import { EquipmentModule } from './equipment/equipment.module';
+import { RoomReservationsModule } from './room-reservations/room-reservations.module';
 
 @Module({
   imports: [
@@ -76,6 +82,9 @@ import { BudgetModule } from './budget/budget.module';
         ExpenseCategory,
         Reimbursement,
         MaterialPurchase,
+        RehearsalRoom,
+        Equipment,
+        RoomReservation,
       ],
       synchronize: true,
     }),
@@ -96,6 +105,9 @@ import { BudgetModule } from './budget/budget.module';
     ActorProfilesModule,
     TasksModule,
     BudgetModule,
+    RehearsalRoomsModule,
+    EquipmentModule,
+    RoomReservationsModule,
   ],
 })
 export class AppModule {}
