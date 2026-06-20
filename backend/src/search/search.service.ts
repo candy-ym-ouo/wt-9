@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
-import { Rehearsal, CastRole, Annotation, Material } from '../entities';
+import { Rehearsal, CastRole, Annotation, Material, Performance } from '../entities';
 import { RehearsalsService } from '../rehearsals/rehearsals.service';
 import { RolesService } from '../roles/roles.service';
 import { AnnotationsService } from '../annotations/annotations.service';
 import { MaterialsService } from '../materials/materials.service';
+import { PerformancesService } from '../performances/performances.service';
 
 interface AdvancedSearchParams {
   query?: string;
@@ -34,6 +35,7 @@ const ENTITY_DATE_FIELDS: Record<string, string[]> = {
   role: ['createdAt', 'updatedAt'],
   annotation: ['createdAt', 'updatedAt'],
   material: ['createdAt', 'updatedAt'],
+  performance: ['startTime', 'createdAt', 'updatedAt'],
 };
 
 @Injectable()
@@ -47,10 +49,13 @@ export class SearchService {
     private annotationRepo: Repository<Annotation>,
     @InjectRepository(Material)
     private materialRepo: Repository<Material>,
+    @InjectRepository(Performance)
+    private performanceRepo: Repository<Performance>,
     private rehearsalsService: RehearsalsService,
     private rolesService: RolesService,
     private annotationsService: AnnotationsService,
     private materialsService: MaterialsService,
+    private performancesService: PerformancesService,
   ) {}
 
   private resolveDateColumn(entityType: string, dateField: string): string {
@@ -68,7 +73,7 @@ export class SearchService {
   async advancedSearch(params: AdvancedSearchParams) {
     const {
       query,
-      modules = ['rehearsals', 'roles', 'annotations', 'materials'],
+      modules = ['rehearsals', 'roles', 'annotations', 'materials', 'performances'],
       dateFrom,
       dateTo,
       dateField = 'createdAt',
@@ -108,7 +113,13 @@ export class SearchService {
       searches.push(Promise.resolve([]));
     }
 
-    const [rehearsals, roles, annotations, materials] = await Promise.all(searches);
+    if (modules.includes('performances')) {
+      searches.push(this.searchPerformances(likeQuery, dateRange, dateField, tags));
+    } else {
+      searches.push(Promise.resolve([]));
+    }
+
+    const [rehearsals, roles, annotations, materials, performances] = await Promise.all(searches);
 
     const rehearsalsWithConflicts = await this.rehearsalsService.enrichWithConflictInfo(rehearsals);
     const rehearsalsWithParticipants = await this.rehearsalsService.enrichWithParticipantInfo(rehearsals);
@@ -132,12 +143,17 @@ export class SearchService {
 
     const enrichedMaterials = await this.materialsService.enrichWithReferenceCounts(materials);
 
+    const enrichedPerformances = await this.performancesService.enrichWithRoleAndMaterialInfo(performances);
+    const performancesWithConflicts = await this.performancesService.enrichWithConflictInfo(performances);
+    const finalPerformances = enrichedPerformances.map((p, i) => ({ ...p, ...performancesWithConflicts[i] }));
+
     const result = {
       rehearsals: enrichedRehearsals,
       roles: enrichedRoles,
       annotations: highlightedAnnotations,
       materials: enrichedMaterials,
-      total: enrichedRehearsals.length + enrichedRoles.length + highlightedAnnotations.length + enrichedMaterials.length,
+      performances: finalPerformances,
+      total: enrichedRehearsals.length + enrichedRoles.length + highlightedAnnotations.length + enrichedMaterials.length + finalPerformances.length,
     };
 
     if (!groupByModule) {
@@ -325,6 +341,49 @@ export class SearchService {
     return qb.getMany();
   }
 
+  private async searchPerformances(
+    likeQuery: string | null,
+    dateRange: { from?: Date; to?: Date } | null,
+    dateField: string,
+    tags?: string[],
+  ) {
+    const qb = this.performanceRepo.createQueryBuilder('p');
+
+    const conditions: string[] = [];
+    const params: any = {};
+
+    if (likeQuery) {
+      conditions.push('(p.title LIKE :q OR p.description LIKE :q OR p.venue LIKE :q OR p.theater LIKE :q OR p.notes LIKE :q)');
+      params.q = likeQuery;
+    }
+
+    if (tags && tags.length > 0) {
+      const tagConditions: string[] = [];
+      tags.forEach((tag, i) => {
+        tagConditions.push(`p.tags LIKE :tag${i}`);
+        params[`tag${i}`] = `%${tag}%`;
+      });
+      conditions.push(`(${tagConditions.join(' OR ')})`);
+    }
+
+    const dateFieldName = this.resolveDateColumn('performance', dateField);
+
+    if (dateRange?.from) {
+      conditions.push(`p.${dateFieldName} >= :dateFrom`);
+      params.dateFrom = dateRange.from;
+    }
+    if (dateRange?.to) {
+      conditions.push(`p.${dateFieldName} <= :dateTo`);
+      params.dateTo = dateRange.to;
+    }
+
+    if (conditions.length > 0) {
+      qb.where(conditions.join(' AND '), params);
+    }
+
+    return qb.getMany();
+  }
+
   private flattenAndSort(result: any, sortBy: string, sortOrder: string, dateField: string, query?: string): SearchResultItem[] {
     const items: SearchResultItem[] = [];
 
@@ -373,6 +432,18 @@ export class SearchService {
         date: this.resolveDateValue(m, 'material', dateField),
         tags: m.tags || [],
         raw: m,
+      });
+    });
+
+    (result.performances || []).forEach((p: any) => {
+      items.push({
+        id: p.id,
+        type: 'performance',
+        title: p.title,
+        description: p.description,
+        date: this.resolveDateValue(p, 'performance', dateField),
+        tags: p.tags || [],
+        raw: p,
       });
     });
 
@@ -425,9 +496,10 @@ export class SearchService {
   }
 
   async getAllTags() {
-    const [annotations, materials] = await Promise.all([
+    const [annotations, materials, performances] = await Promise.all([
       this.annotationRepo.find({ select: ['tag', 'tagColor'] }),
       this.materialRepo.find({ select: ['tags'] }),
+      this.performanceRepo.find({ select: ['tags'] }),
     ]);
 
     const tagMap = new Map<string, string | null>();
@@ -441,6 +513,14 @@ export class SearchService {
     materials.forEach((m) => {
       if (m.tags && Array.isArray(m.tags)) {
         m.tags.forEach((t) => {
+          if (!tagMap.has(t)) tagMap.set(t, null);
+        });
+      }
+    });
+
+    performances.forEach((p) => {
+      if (p.tags && Array.isArray(p.tags)) {
+        p.tags.forEach((t) => {
           if (!tagMap.has(t)) tagMap.set(t, null);
         });
       }

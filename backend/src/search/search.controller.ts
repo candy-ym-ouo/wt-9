@@ -20,7 +20,7 @@ export class SearchController {
     @Query('groupByModule') groupByModule?: string,
   ) {
     if ((!query || query.trim().length === 0) && !modules && !dateFrom && !dateTo && !tags) {
-      return { rehearsals: [], roles: [], annotations: [], materials: [], total: 0 };
+      return { rehearsals: [], roles: [], annotations: [], materials: [], performances: [], total: 0 };
     }
     return this.service.advancedSearch({
       query: query?.trim(),

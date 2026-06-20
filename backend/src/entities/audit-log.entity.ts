@@ -19,6 +19,14 @@ export enum AuditAction {
   UPDATE_REHEARSAL = 'update_rehearsal',
   DELETE_REHEARSAL = 'delete_rehearsal',
   UPDATE_ATTENDANCE = 'update_attendance',
+  CREATE_PERFORMANCE = 'create_performance',
+  UPDATE_PERFORMANCE = 'update_performance',
+  DELETE_PERFORMANCE = 'delete_performance',
+  UPDATE_PERFORMANCE_STATUS = 'update_performance_status',
+  BIND_PERFORMANCE_ROLE = 'bind_performance_role',
+  UNBIND_PERFORMANCE_ROLE = 'unbind_performance_role',
+  BIND_PERFORMANCE_MATERIAL = 'bind_performance_material',
+  UNBIND_PERFORMANCE_MATERIAL = 'unbind_performance_material',
 }
 
 export enum AuditModule {
@@ -26,6 +34,7 @@ export enum AuditModule {
   ROLE = 'role',
   MATERIAL = 'material',
   REHEARSAL = 'rehearsal',
+  PERFORMANCE = 'performance',
 }
 
 @Entity('audit_logs')

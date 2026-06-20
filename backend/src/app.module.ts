@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
-import { User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig, AuditLog } from './entities';
+import { User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig, AuditLog, Performance } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RehearsalsModule } from './rehearsals/rehearsals.module';
@@ -13,6 +13,7 @@ import { LeavesModule } from './leaves/leaves.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PerformancesModule } from './performances/performances.module';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
       type: 'sqljs',
       location: join(process.cwd(), 'theater.db'),
       autoSave: true,
-      entities: [User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig, AuditLog],
+      entities: [User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig, AuditLog, Performance],
       synchronize: true,
     }),
     AuthModule,
@@ -34,6 +35,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     RemindersModule,
     AuditLogsModule,
     DashboardModule,
+    PerformancesModule,
   ],
 })
 export class AppModule {}
