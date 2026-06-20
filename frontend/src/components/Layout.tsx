@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { path: '/calendar', label: '排练日历', icon: '📅' },
   { path: '/performances', label: '演出场次', icon: '🎪' },
   { path: '/roles', label: '角色分配', icon: '🎭' },
+  { path: '/scripts', label: '剧本库', icon: '📚' },
   { path: '/leaves', label: '请假管理', icon: '📝' },
   { path: '/annotations', label: '文本批注', icon: '📝' },
   { path: '/materials', label: '素材上传', icon: '📁' },

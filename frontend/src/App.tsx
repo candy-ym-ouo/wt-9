@@ -13,6 +13,8 @@ import SearchPage from './pages/SearchPage';
 import AdminPage from './pages/AdminPage';
 import LeavesPage from './pages/LeavesPage';
 import AuditLogsPage from './pages/AuditLogsPage';
+import ScriptsPage from './pages/ScriptsPage';
+import ScriptDetailPage from './pages/ScriptDetailPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -37,6 +39,8 @@ function AppRoutes() {
       <Route path="/performances" element={<ProtectedRoute><PerformancesPage /></ProtectedRoute>} />
       <Route path="/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
       <Route path="/leaves" element={<ProtectedRoute><LeavesPage /></ProtectedRoute>} />
+      <Route path="/scripts" element={<ProtectedRoute><ScriptsPage /></ProtectedRoute>} />
+      <Route path="/scripts/:id" element={<ProtectedRoute><ScriptDetailPage /></ProtectedRoute>} />
       <Route path="/annotations" element={<ProtectedRoute><AnnotationsPage /></ProtectedRoute>} />
       <Route path="/materials" element={<ProtectedRoute><MaterialsPage /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />

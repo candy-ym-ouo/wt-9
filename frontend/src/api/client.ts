@@ -360,4 +360,98 @@ export const api = {
     getVenues: () => request<string[]>('/performances/meta/venues'),
     getTheaters: () => request<string[]>('/performances/meta/theaters'),
   },
+  scripts: {
+    list: (params?: { keyword?: string; status?: string; tags?: string; author?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.keyword) searchParams.set('keyword', params.keyword);
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.tags) searchParams.set('tags', params.tags);
+      if (params?.author) searchParams.set('author', params.author);
+      const q = searchParams.toString();
+      return request<any[]>(`/scripts${q ? '?' + q : ''}`);
+    },
+    get: (id: number) => request<any>(`/scripts/${id}`),
+    getStructure: (id: number) => request<any>(`/scripts/${id}/structure`),
+    search: (q: string, scriptId?: number) => {
+      const params = new URLSearchParams({ q });
+      if (scriptId) params.set('scriptId', String(scriptId));
+      return request<any[]>(`/scripts/search?${params.toString()}`);
+    },
+    getTags: () => request<string[]>('/scripts/tags'),
+    getAuthors: () => request<string[]>('/scripts/authors'),
+    getCharacterNames: (scriptId?: number) => {
+      const params = new URLSearchParams();
+      if (scriptId) params.set('scriptId', String(scriptId));
+      const q = params.toString();
+      return request<string[]>(`/scripts/characters${q ? '?' + q : ''}`);
+    },
+    create: (data: {
+      title: string;
+      originalTitle?: string;
+      author?: string;
+      translator?: string;
+      description?: string;
+      synopsis?: string;
+      genre?: string[];
+      estimatedDuration?: number;
+      rawContent: string;
+      parsedContent?: string;
+      tags?: string[];
+      chapters?: any[];
+      scenes?: any[];
+    }) => request<any>('/scripts', { method: 'POST', body: JSON.stringify(data) }),
+    uploadScript: (data: {
+      title: string;
+      content: string;
+      fileName?: string;
+      mimeType?: string;
+      fileSize?: number;
+      format?: string;
+      author?: string;
+      description?: string;
+      autoParse?: boolean;
+    }) => request<any>('/scripts/upload', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: {
+      title?: string;
+      originalTitle?: string;
+      author?: string;
+      translator?: string;
+      description?: string;
+      synopsis?: string;
+      genre?: string[];
+      estimatedDuration?: number;
+      status?: string;
+      rawContent?: string;
+      parsedContent?: string;
+      tags?: string[];
+      characterNames?: string[];
+      changeNote?: string;
+    }) => request<any>(`/scripts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => request<any>(`/scripts/${id}`, { method: 'DELETE' }),
+    publish: (id: number) => request<any>(`/scripts/${id}/publish`, { method: 'POST' }),
+    archive: (id: number) => request<any>(`/scripts/${id}/archive`, { method: 'POST' }),
+    reparse: (id: number) => request<any>(`/scripts/${id}/reparse`, { method: 'POST' }),
+    getChapter: (scriptId: number, chapterId: number) =>
+      request<any>(`/scripts/${scriptId}/chapters/${chapterId}`),
+    updateChapter: (scriptId: number, chapterId: number, data: any) =>
+      request<any>(`/scripts/${scriptId}/chapters/${chapterId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    getChapterAnnotations: (scriptId: number, chapterId: number) =>
+      request<any[]>(`/scripts/${scriptId}/chapters/${chapterId}/annotations`),
+    getScene: (scriptId: number, sceneId: number) =>
+      request<any>(`/scripts/${scriptId}/scenes/${sceneId}`),
+    updateScene: (scriptId: number, sceneId: number, data: any) =>
+      request<any>(`/scripts/${scriptId}/scenes/${sceneId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    getSceneAnnotations: (scriptId: number, sceneId: number) =>
+      request<any[]>(`/scripts/${scriptId}/scenes/${sceneId}/annotations`),
+    getAnnotations: (scriptId: number) =>
+      request<any[]>(`/scripts/${scriptId}/annotations`),
+    getAnnotationsGrouped: (scriptId: number) =>
+      request<any[]>(`/scripts/${scriptId}/annotations/grouped`),
+    getVersions: (scriptId: number) =>
+      request<any[]>(`/scripts/${scriptId}/versions`),
+    getVersion: (scriptId: number, versionId: number) =>
+      request<any>(`/scripts/${scriptId}/versions/${versionId}`),
+    restoreVersion: (scriptId: number, versionId: number) =>
+      request<any>(`/scripts/${scriptId}/versions/${versionId}/restore`, { method: 'POST' }),
+  },
 };
