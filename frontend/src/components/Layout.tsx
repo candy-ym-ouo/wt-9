@@ -123,6 +123,21 @@ export default function Layout({ children }: { children: ReactNode }) {
               >
                 📋 操作审计
               </NavLink>
+              <NavLink
+                to="/reports"
+                style={({ isActive }) => ({
+                  display: 'block',
+                  padding: '10px 20px',
+                  color: isActive ? '#e74c3c' : '#aaa',
+                  textDecoration: 'none',
+                  fontSize: 14,
+                  background: isActive ? '#2a1515' : 'transparent',
+                  borderLeft: isActive ? '3px solid #e74c3c' : '3px solid transparent',
+                  transition: 'all 0.2s',
+                })}
+              >
+                📊 报表中心
+              </NavLink>
             </>
           )}
         </nav>

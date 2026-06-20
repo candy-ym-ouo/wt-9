@@ -300,6 +300,27 @@ export const api = {
   dashboard: {
     overview: () => request<any>('/dashboard/overview'),
   },
+  reports: {
+    getReports: (params?: {
+      dateFrom?: string;
+      dateTo?: string;
+      actorId?: number;
+      scriptId?: number;
+      materialCategory?: string;
+      annotationTag?: string;
+    }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.dateFrom) searchParams.set('dateFrom', params.dateFrom);
+      if (params?.dateTo) searchParams.set('dateTo', params.dateTo);
+      if (params?.actorId) searchParams.set('actorId', String(params.actorId));
+      if (params?.scriptId) searchParams.set('scriptId', String(params.scriptId));
+      if (params?.materialCategory) searchParams.set('materialCategory', params.materialCategory);
+      if (params?.annotationTag) searchParams.set('annotationTag', params.annotationTag);
+      const q = searchParams.toString();
+      return request<any>(`/reports${q ? '?' + q : ''}`);
+    },
+    getFilterOptions: () => request<any>('/reports/filter-options'),
+  },
   performances: {
     list: (params?: {
       start?: string;

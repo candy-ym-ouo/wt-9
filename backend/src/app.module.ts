@@ -52,6 +52,7 @@ import { RehearsalRoomsModule } from './rehearsal-rooms/rehearsal-rooms.module';
 import { EquipmentModule } from './equipment/equipment.module';
 import { RoomReservationsModule } from './room-reservations/room-reservations.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -112,6 +113,7 @@ import { AnnouncementsModule } from './announcements/announcements.module';
     EquipmentModule,
     RoomReservationsModule,
     AnnouncementsModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
