@@ -31,3 +31,6 @@ export { Approval, ApprovalType, ApprovalStatus, ApprovalStepStatus } from './ap
 export { Tag, TagCategory } from './tag.entity';
 export { TagRelation, TagTargetType } from './tag-relation.entity';
 export { Subscription, SubscriptionTargetType, SubscriptionType } from './subscription.entity';
+export { Share, ShareTargetType, ShareStatus, AccessScope } from './share.entity';
+export { Visitor, VisitorStatus } from './visitor.entity';
+export { VisitorAccessLog, VisitorAction } from './visitor-access-log.entity';

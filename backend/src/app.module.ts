@@ -36,6 +36,9 @@ import {
   Tag,
   TagRelation,
   Subscription,
+  Share,
+  Visitor,
+  VisitorAccessLog,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -63,6 +66,7 @@ import { DramasModule } from './dramas/dramas.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { TagsModule } from './tags/tags.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { VisitorCollaborationModule } from './visitor-collaboration/visitor-collaboration.module';
 
 @Module({
   imports: [
@@ -105,6 +109,9 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
         Tag,
         TagRelation,
         Subscription,
+        Share,
+        Visitor,
+        VisitorAccessLog,
       ],
       synchronize: true,
     }),
@@ -134,6 +141,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     ApprovalsModule,
     TagsModule,
     SubscriptionsModule,
+    VisitorCollaborationModule,
   ],
 })
 export class AppModule {}

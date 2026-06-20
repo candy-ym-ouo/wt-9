@@ -113,6 +113,12 @@ export enum AuditAction {
   CREATE_SUBSCRIPTION = 'create_subscription',
   UPDATE_SUBSCRIPTION = 'update_subscription',
   DELETE_SUBSCRIPTION = 'delete_subscription',
+  CREATE_SHARE = 'create_share',
+  UPDATE_SHARE = 'update_share',
+  REVOKE_SHARE = 'revoke_share',
+  EXTEND_SHARE = 'extend_share',
+  VISITOR_ACCESS = 'visitor_access',
+  VISITOR_DOWNLOAD = 'visitor_download',
 }
 
 export enum AuditModule {
@@ -137,6 +143,8 @@ export enum AuditModule {
   ANNOTATION = 'annotation',
   APPROVAL = 'approval',
   SUBSCRIPTION = 'subscription',
+  SHARE = 'share',
+  VISITOR = 'visitor',
 }
 
 @Entity('audit_logs')
