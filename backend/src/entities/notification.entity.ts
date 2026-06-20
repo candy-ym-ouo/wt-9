@@ -6,6 +6,10 @@ export enum NotificationType {
   MATERIAL_UPDATE = 'material_update',
   ANNOTATION_REPLY = 'annotation_reply',
   SYSTEM_ANNOUNCEMENT = 'system_announcement',
+  LEAVE_SUBMITTED = 'leave_submitted',
+  LEAVE_APPROVED = 'leave_approved',
+  LEAVE_REJECTED = 'leave_rejected',
+  LEAVE_SUBSTITUTE_ASSIGNED = 'leave_substitute_assigned',
 }
 
 export enum NotificationStatus {
@@ -58,6 +62,9 @@ export class Notification {
 
   @Column({ nullable: true })
   annotationId: number;
+
+  @Column({ nullable: true })
+  leaveId: number;
 
   @Column({ nullable: true })
   senderId: number;

@@ -11,6 +11,8 @@ import {
   Rehearsal,
   Material,
   Annotation,
+  LeaveRequest,
+  LeaveType,
 } from '../entities';
 
 export interface CreateNotificationDto {
@@ -24,6 +26,7 @@ export interface CreateNotificationDto {
   rehearsalId?: number;
   materialId?: number;
   annotationId?: number;
+  leaveId?: number;
   senderId?: number;
   expiresAt?: Date;
 }
@@ -85,6 +88,7 @@ export class NotificationsService {
         rehearsalId: dto.rehearsalId,
         materialId: dto.materialId,
         annotationId: dto.annotationId,
+        leaveId: dto.leaveId,
         senderId: dto.senderId,
         expiresAt: dto.expiresAt,
       });
@@ -430,6 +434,101 @@ export class NotificationsService {
     });
   }
 
+  async notifyLeaveSubmitted(
+    leaveId: number,
+    actorName: string,
+    leaveType: LeaveType,
+    startDate: Date,
+    endDate: Date,
+    reason?: string,
+    senderId?: number,
+  ): Promise<Notification[]> {
+    const leaveTypeLabels: Record<LeaveType, string> = {
+      [LeaveType.SICK]: '病假',
+      [LeaveType.PERSONAL]: '事假',
+      [LeaveType.OTHER]: '其他',
+    };
+
+    const dateStr = `${startDate.toLocaleDateString('zh-CN')} 至 ${endDate.toLocaleDateString('zh-CN')}`;
+
+    return this.create({
+      type: NotificationType.LEAVE_SUBMITTED,
+      title: '新请假申请',
+      message: `${actorName} 提交了${leaveTypeLabels[leaveType]}申请\n时间：${dateStr}${reason ? `\n原因：${reason}` : ''}`,
+      priority: NotificationPriority.HIGH,
+      targetRoles: [UserRole.ADMIN, UserRole.DIRECTOR],
+      leaveId,
+      senderId,
+      metadata: { leaveId, actorName, leaveType, startDate, endDate, reason },
+    });
+  }
+
+  async notifyLeaveApproved(
+    leaveId: number,
+    actorId: number,
+    reviewerName: string,
+    substituteActorName?: string,
+    senderId?: number,
+  ): Promise<Notification[]> {
+    let message = `您的请假申请已由 ${reviewerName} 批准`;
+    if (substituteActorName) {
+      message += `\n替补演员：${substituteActorName}`;
+    }
+
+    return this.create({
+      type: NotificationType.LEAVE_APPROVED,
+      title: '请假申请已批准',
+      message,
+      priority: NotificationPriority.HIGH,
+      targetUserIds: [actorId],
+      leaveId,
+      senderId,
+      metadata: { leaveId, actorId, reviewerName, substituteActorName },
+    });
+  }
+
+  async notifyLeaveRejected(
+    leaveId: number,
+    actorId: number,
+    reviewerName: string,
+    rejectionReason: string,
+    senderId?: number,
+  ): Promise<Notification[]> {
+    return this.create({
+      type: NotificationType.LEAVE_REJECTED,
+      title: '请假申请被拒绝',
+      message: `您的请假申请已被 ${reviewerName} 拒绝\n拒绝原因：${rejectionReason}`,
+      priority: NotificationPriority.HIGH,
+      targetUserIds: [actorId],
+      leaveId,
+      senderId,
+      metadata: { leaveId, actorId, reviewerName, rejectionReason },
+    });
+  }
+
+  async notifyLeaveSubstituteAssigned(
+    leaveId: number,
+    substituteActorId: number,
+    actorName: string,
+    startDate: Date,
+    endDate: Date,
+    roleName?: string,
+    senderId?: number,
+  ): Promise<Notification[]> {
+    const dateStr = `${startDate.toLocaleDateString('zh-CN')} 至 ${endDate.toLocaleDateString('zh-CN')}`;
+
+    return this.create({
+      type: NotificationType.LEAVE_SUBSTITUTE_ASSIGNED,
+      title: '替补任务通知',
+      message: `您被安排为 ${actorName} 的替补\n时间：${dateStr}${roleName ? `\n角色：${roleName}` : ''}`,
+      priority: NotificationPriority.URGENT,
+      targetUserIds: [substituteActorId],
+      leaveId,
+      senderId,
+      metadata: { leaveId, substituteActorId, actorName, startDate, endDate, roleName },
+    });
+  }
+
   async createSystemAnnouncement(
     title: string,
     message: string,
@@ -462,6 +561,10 @@ export class NotificationsService {
       { value: NotificationType.MATERIAL_UPDATE, label: '素材更新' },
       { value: NotificationType.ANNOTATION_REPLY, label: '批注回复' },
       { value: NotificationType.SYSTEM_ANNOUNCEMENT, label: '系统公告' },
+      { value: NotificationType.LEAVE_SUBMITTED, label: '请假申请提交' },
+      { value: NotificationType.LEAVE_APPROVED, label: '请假申请批准' },
+      { value: NotificationType.LEAVE_REJECTED, label: '请假申请拒绝' },
+      { value: NotificationType.LEAVE_SUBSTITUTE_ASSIGNED, label: '替补任务分配' },
     ];
   }
 

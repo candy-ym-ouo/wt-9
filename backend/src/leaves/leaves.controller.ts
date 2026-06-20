@@ -27,6 +27,21 @@ export class LeavesController {
     });
   }
 
+  @Get('mine')
+  getMyLeaves(
+    @Request() req: any,
+    @Query('status') status?: LeaveStatus,
+  ) {
+    return this.service.getMyLeaves(req.user.userId, status);
+  }
+
+  @Get('pending')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  getPendingLeaves() {
+    return this.service.getPendingLeaves();
+  }
+
   @Get('statistics')
   getStatistics() {
     return this.service.getStatistics();
@@ -79,12 +94,13 @@ export class LeavesController {
       roleId: number;
       substituteActorId: number;
     }>,
+    @Request() req: any,
   ) {
     try {
       const data: any = { ...body };
       if (body.startDate) data.startDate = new Date(body.startDate);
       if (body.endDate) data.endDate = new Date(body.endDate);
-      return await this.service.update(id, data);
+      return await this.service.update(id, data, req.user.userId);
     } catch (e: any) {
       throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
     }
@@ -123,7 +139,7 @@ export class LeavesController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  remove(@Param('id') id: number) {
-    return this.service.remove(id);
+  remove(@Param('id') id: number, @Request() req: any) {
+    return this.service.remove(id, req.user.userId);
   }
 }

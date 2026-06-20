@@ -82,6 +82,12 @@ export enum AuditAction {
   APPROVE_ROOM_RESERVATION = 'approve_room_reservation',
   REJECT_ROOM_RESERVATION = 'reject_room_reservation',
   CANCEL_ROOM_RESERVATION = 'cancel_room_reservation',
+  CREATE_LEAVE = 'create_leave',
+  UPDATE_LEAVE = 'update_leave',
+  DELETE_LEAVE = 'delete_leave',
+  APPROVE_LEAVE = 'approve_leave',
+  REJECT_LEAVE = 'reject_leave',
+  UPDATE_LEAVE_SUBSTITUTE = 'update_leave_substitute',
 }
 
 export enum AuditModule {
@@ -100,6 +106,7 @@ export enum AuditModule {
   REHEARSAL_ROOM = 'rehearsal_room',
   EQUIPMENT = 'equipment',
   ROOM_RESERVATION = 'room_reservation',
+  LEAVE = 'leave',
 }
 
 @Entity('audit_logs')
