@@ -6,6 +6,7 @@ import { RolesController } from './roles.controller';
 import { LeavesModule } from '../leaves/leaves.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { DramasModule } from '../dramas/dramas.module';
+import { TagsModule } from '../tags/tags.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { DramasModule } from '../dramas/dramas.module';
     LeavesModule,
     forwardRef(() => AuditLogsModule),
     forwardRef(() => DramasModule),
+    forwardRef(() => TagsModule),
   ],
   providers: [RolesService],
   controllers: [RolesController],

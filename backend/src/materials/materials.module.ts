@@ -6,6 +6,7 @@ import { MaterialsController } from './materials.controller';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DramasModule } from '../dramas/dramas.module';
+import { TagsModule } from '../tags/tags.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { DramasModule } from '../dramas/dramas.module';
     forwardRef(() => AuditLogsModule),
     NotificationsModule,
     forwardRef(() => DramasModule),
+    forwardRef(() => TagsModule),
   ],
   providers: [MaterialsService],
   controllers: [MaterialsController],

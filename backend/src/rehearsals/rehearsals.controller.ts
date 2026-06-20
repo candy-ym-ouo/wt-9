@@ -3,12 +3,18 @@ import { RehearsalsService } from './rehearsals.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole, Rehearsal } from '../entities';
+import { UserRole, Rehearsal, TagTargetType } from '../entities';
+import { TagsService } from '../tags/tags.service';
 
 @Controller('rehearsals')
 @UseGuards(JwtAuthGuard)
 export class RehearsalsController {
-  constructor(private service: RehearsalsService) {}
+  constructor(private service: RehearsalsService, private tagsService: TagsService) {}
+
+  @Get(':id/tags')
+  getRehearsalTags(@Param('id') id: number) {
+    return this.tagsService.getTagsForTarget(TagTargetType.REHEARSAL, id);
+  }
 
   @Get()
   async findAll(

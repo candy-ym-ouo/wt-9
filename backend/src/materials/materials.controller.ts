@@ -19,10 +19,11 @@ import { MaterialsService } from './materials.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole, Material } from '../entities';
+import { UserRole, Material, TagTargetType } from '../entities';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { TagsService } from '../tags/tags.service';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
@@ -33,7 +34,12 @@ if (!existsSync(UPLOAD_DIR)) {
 @Controller('materials')
 @UseGuards(JwtAuthGuard)
 export class MaterialsController {
-  constructor(private service: MaterialsService) {}
+  constructor(private service: MaterialsService, private tagsService: TagsService) {}
+
+  @Get(':id/tags')
+  getMaterialTags(@Param('id') id: number) {
+    return this.tagsService.getTagsForTarget(TagTargetType.MATERIAL, id);
+  }
 
   @Get()
   async findAll(

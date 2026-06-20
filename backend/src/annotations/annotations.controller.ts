@@ -3,12 +3,18 @@ import { AnnotationsService } from './annotations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole, Annotation } from '../entities';
+import { UserRole, Annotation, TagTargetType } from '../entities';
+import { TagsService } from '../tags/tags.service';
 
 @Controller('annotations')
 @UseGuards(JwtAuthGuard)
 export class AnnotationsController {
-  constructor(private service: AnnotationsService) {}
+  constructor(private service: AnnotationsService, private tagsService: TagsService) {}
+
+  @Get(':id/tags')
+  getAnnotationTags(@Param('id') id: number) {
+    return this.tagsService.getTagsForTarget(TagTargetType.ANNOTATION, id);
+  }
 
   @Get()
   findAll(@Query('dramaId') dramaId: number, @Query('scene') scene?: string, @Request() req?: any) {

@@ -33,6 +33,8 @@ import {
   Drama,
   DramaPermission,
   Approval,
+  Tag,
+  TagRelation,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -58,6 +60,7 @@ import { AnnouncementsModule } from './announcements/announcements.module';
 import { ReportsModule } from './reports/reports.module';
 import { DramasModule } from './dramas/dramas.module';
 import { ApprovalsModule } from './approvals/approvals.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -97,6 +100,8 @@ import { ApprovalsModule } from './approvals/approvals.module';
         Drama,
         DramaPermission,
         Approval,
+        Tag,
+        TagRelation,
       ],
       synchronize: true,
     }),
@@ -124,6 +129,7 @@ import { ApprovalsModule } from './approvals/approvals.module';
     AnnouncementsModule,
     ReportsModule,
     ApprovalsModule,
+    TagsModule,
   ],
 })
 export class AppModule {}

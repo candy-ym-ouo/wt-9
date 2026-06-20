@@ -3,12 +3,18 @@ import { RolesService } from './roles.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserRole, CastRole } from '../entities';
+import { UserRole, CastRole, TagTargetType } from '../entities';
+import { TagsService } from '../tags/tags.service';
 
 @Controller('roles')
 @UseGuards(JwtAuthGuard)
 export class RolesController {
-  constructor(private service: RolesService) {}
+  constructor(private service: RolesService, private tagsService: TagsService) {}
+
+  @Get(':id/tags')
+  getRoleTags(@Param('id') id: number) {
+    return this.tagsService.getTagsForTarget(TagTargetType.ROLE, id);
+  }
 
   @Get()
   findAll(@Query('dramaId') dramaId: number, @Request() req: any) {

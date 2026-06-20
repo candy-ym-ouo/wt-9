@@ -28,3 +28,5 @@ export { Announcement, AnnouncementCategory, AnnouncementStatus } from './announ
 export { Drama, DramaStatus } from './drama.entity';
 export { DramaPermission, DramaRole } from './drama-permission.entity';
 export { Approval, ApprovalType, ApprovalStatus, ApprovalStepStatus } from './approval.entity';
+export { Tag, TagCategory } from './tag.entity';
+export { TagRelation, TagTargetType } from './tag-relation.entity';
