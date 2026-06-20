@@ -27,6 +27,16 @@ export enum AuditAction {
   UNBIND_PERFORMANCE_ROLE = 'unbind_performance_role',
   BIND_PERFORMANCE_MATERIAL = 'bind_performance_material',
   UNBIND_PERFORMANCE_MATERIAL = 'unbind_performance_material',
+  UPLOAD_SCRIPT = 'upload_script',
+  CREATE_SCRIPT = 'create_script',
+  UPDATE_SCRIPT = 'update_script',
+  DELETE_SCRIPT = 'delete_script',
+  PUBLISH_SCRIPT = 'publish_script',
+  ARCHIVE_SCRIPT = 'archive_script',
+  RESTORE_SCRIPT_VERSION = 'restore_script_version',
+  UPDATE_SCRIPT_CHAPTER = 'update_script_chapter',
+  UPDATE_SCRIPT_SCENE = 'update_script_scene',
+  REPARSE_SCRIPT = 'reparse_script',
 }
 
 export enum AuditModule {
@@ -35,6 +45,7 @@ export enum AuditModule {
   MATERIAL = 'material',
   REHEARSAL = 'rehearsal',
   PERFORMANCE = 'performance',
+  SCRIPT = 'script',
 }
 
 @Entity('audit_logs')

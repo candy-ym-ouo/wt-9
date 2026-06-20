@@ -1,7 +1,23 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
-import { User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig, AuditLog, Performance } from './entities';
+import {
+  User,
+  Rehearsal,
+  CastRole,
+  Annotation,
+  AnnotationVersion,
+  Material,
+  LeaveRequest,
+  Reminder,
+  ReminderConfig,
+  AuditLog,
+  Performance,
+  Script,
+  ScriptChapter,
+  ScriptScene,
+  ScriptVersion,
+} from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RehearsalsModule } from './rehearsals/rehearsals.module';
@@ -14,6 +30,7 @@ import { RemindersModule } from './reminders/reminders.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PerformancesModule } from './performances/performances.module';
+import { ScriptsModule } from './scripts/scripts.module';
 
 @Module({
   imports: [
@@ -21,7 +38,23 @@ import { PerformancesModule } from './performances/performances.module';
       type: 'sqljs',
       location: join(process.cwd(), 'theater.db'),
       autoSave: true,
-      entities: [User, Rehearsal, CastRole, Annotation, AnnotationVersion, Material, LeaveRequest, Reminder, ReminderConfig, AuditLog, Performance],
+      entities: [
+        User,
+        Rehearsal,
+        CastRole,
+        Annotation,
+        AnnotationVersion,
+        Material,
+        LeaveRequest,
+        Reminder,
+        ReminderConfig,
+        AuditLog,
+        Performance,
+        Script,
+        ScriptChapter,
+        ScriptScene,
+        ScriptVersion,
+      ],
       synchronize: true,
     }),
     AuthModule,
@@ -36,6 +69,7 @@ import { PerformancesModule } from './performances/performances.module';
     AuditLogsModule,
     DashboardModule,
     PerformancesModule,
+    ScriptsModule,
   ],
 })
 export class AppModule {}

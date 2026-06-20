@@ -32,6 +32,15 @@ export class Annotation {
   @Column({ nullable: true })
   sceneNumber: number;
 
+  @Column({ nullable: true })
+  scriptId: number;
+
+  @Column({ nullable: true })
+  chapterId: number;
+
+  @Column({ nullable: true })
+  sceneId: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

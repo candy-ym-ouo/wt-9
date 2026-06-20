@@ -9,3 +9,7 @@ export { ReminderConfig, ReminderType, ReminderChannel } from './reminder-config
 export { Reminder, ReminderStatus } from './reminder.entity';
 export { AuditLog, AuditAction, AuditModule } from './audit-log.entity';
 export { Performance, PerformanceStatus } from './performance.entity';
+export { Script, ScriptStatus, ScriptFormat } from './script.entity';
+export { ScriptChapter } from './script-chapter.entity';
+export { ScriptScene, SceneTimeOfDay, SceneLocationType } from './script-scene.entity';
+export { ScriptVersion, ScriptVersionAction } from './script-version.entity';
