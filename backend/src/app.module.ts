@@ -67,6 +67,7 @@ import { ApprovalsModule } from './approvals/approvals.module';
 import { TagsModule } from './tags/tags.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { VisitorCollaborationModule } from './visitor-collaboration/visitor-collaboration.module';
+import { DataImportModule } from './data-import/data-import.module';
 
 @Module({
   imports: [
@@ -142,6 +143,7 @@ import { VisitorCollaborationModule } from './visitor-collaboration/visitor-coll
     TagsModule,
     SubscriptionsModule,
     VisitorCollaborationModule,
+    DataImportModule,
   ],
 })
 export class AppModule {}

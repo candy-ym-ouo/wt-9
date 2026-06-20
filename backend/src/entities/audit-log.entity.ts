@@ -119,6 +119,8 @@ export enum AuditAction {
   EXTEND_SHARE = 'extend_share',
   VISITOR_ACCESS = 'visitor_access',
   VISITOR_DOWNLOAD = 'visitor_download',
+  IMPORT_PREVIEW = 'import_preview',
+  IMPORT_EXECUTE = 'import_execute',
 }
 
 export enum AuditModule {
@@ -145,6 +147,7 @@ export enum AuditModule {
   SUBSCRIPTION = 'subscription',
   SHARE = 'share',
   VISITOR = 'visitor',
+  DATA_IMPORT = 'data_import',
 }
 
 @Entity('audit_logs')
