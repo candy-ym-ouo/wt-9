@@ -18,3 +18,6 @@ export { ActorProfile, ActorGender, ActorStatus } from './actor-profile.entity';
 export { RehearsalAvailability, RehearsalAvailabilityException, Weekday, AvailabilityType } from './rehearsal-availability.entity';
 export { HistoricalRole, HistoricalRoleStatus } from './historical-role.entity';
 export { Task, TaskCategory, TaskStatus, TaskPriority } from './task.entity';
+export { ExpenseCategory } from './expense-category.entity';
+export { Reimbursement, ReimbursementStatus } from './reimbursement.entity';
+export { MaterialPurchase, PurchaseStatus } from './material-purchase.entity';

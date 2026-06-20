@@ -54,6 +54,22 @@ export enum AuditAction {
   ADD_TASK_COMMENT = 'add_task_comment',
   ADD_TASK_FOLLOWER = 'add_task_follower',
   REMOVE_TASK_FOLLOWER = 'remove_task_follower',
+  CREATE_EXPENSE_CATEGORY = 'create_expense_category',
+  UPDATE_EXPENSE_CATEGORY = 'update_expense_category',
+  DELETE_EXPENSE_CATEGORY = 'delete_expense_category',
+  CREATE_REIMBURSEMENT = 'create_reimbursement',
+  UPDATE_REIMBURSEMENT = 'update_reimbursement',
+  DELETE_REIMBURSEMENT = 'delete_reimbursement',
+  APPROVE_REIMBURSEMENT = 'approve_reimbursement',
+  REJECT_REIMBURSEMENT = 'reject_reimbursement',
+  PAY_REIMBURSEMENT = 'pay_reimbursement',
+  CREATE_MATERIAL_PURCHASE = 'create_material_purchase',
+  UPDATE_MATERIAL_PURCHASE = 'update_material_purchase',
+  DELETE_MATERIAL_PURCHASE = 'delete_material_purchase',
+  APPROVE_MATERIAL_PURCHASE = 'approve_material_purchase',
+  REJECT_MATERIAL_PURCHASE = 'reject_material_purchase',
+  ORDER_MATERIAL_PURCHASE = 'order_material_purchase',
+  RECEIVE_MATERIAL_PURCHASE = 'receive_material_purchase',
 }
 
 export enum AuditModule {
@@ -65,6 +81,10 @@ export enum AuditModule {
   SCRIPT = 'script',
   ACTOR_PROFILE = 'actor_profile',
   TASK = 'task',
+  BUDGET = 'budget',
+  EXPENSE_CATEGORY = 'expense_category',
+  REIMBURSEMENT = 'reimbursement',
+  MATERIAL_PURCHASE = 'material_purchase',
 }
 
 @Entity('audit_logs')
