@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import RemindersPage from './pages/RemindersPage';
 import CalendarPage from './pages/CalendarPage';
+import PerformancesPage from './pages/PerformancesPage';
 import RolesPage from './pages/RolesPage';
 import AnnotationsPage from './pages/AnnotationsPage';
 import MaterialsPage from './pages/MaterialsPage';
@@ -33,6 +34,7 @@ function AppRoutes() {
       <Route path="/login" element={token ? <Navigate to="/reminders" /> : <LoginPage />} />
       <Route path="/reminders" element={<ProtectedRoute><RemindersPage /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+      <Route path="/performances" element={<ProtectedRoute><PerformancesPage /></ProtectedRoute>} />
       <Route path="/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
       <Route path="/leaves" element={<ProtectedRoute><LeavesPage /></ProtectedRoute>} />
       <Route path="/annotations" element={<ProtectedRoute><AnnotationsPage /></ProtectedRoute>} />

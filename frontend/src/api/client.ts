@@ -300,4 +300,64 @@ export const api = {
   dashboard: {
     overview: () => request<any>('/dashboard/overview'),
   },
+  performances: {
+    list: (params?: {
+      start?: string;
+      end?: string;
+      venue?: string;
+      theater?: string;
+      status?: string;
+      roleId?: string;
+      keyword?: string;
+      tags?: string;
+    }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.start) searchParams.set('start', params.start);
+      if (params?.end) searchParams.set('end', params.end);
+      if (params?.venue) searchParams.set('venue', params.venue);
+      if (params?.theater) searchParams.set('theater', params.theater);
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.roleId) searchParams.set('roleId', params.roleId);
+      if (params?.keyword) searchParams.set('keyword', params.keyword);
+      if (params?.tags) searchParams.set('tags', params.tags);
+      const q = searchParams.toString();
+      return request<any[]>(`/performances${q ? '?' + q : ''}`);
+    },
+    get: (id: number) => request<any>(`/performances/${id}`),
+    getRoles: (id: number) => request<any[]>(`/performances/${id}/roles`),
+    getMaterials: (id: number) => request<any[]>(`/performances/${id}/materials`),
+    listByDateRange: (start: string, end: string) =>
+      request<any[]>(`/performances/date-range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+    checkConflicts: (data: { startTime: string; endTime: string; excludeId?: number; venue?: string; theater?: string }) =>
+      request<any>('/performances/check-conflicts', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: any) =>
+      request<any>('/performances', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) =>
+      request<any>(`/performances/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    updateStatus: (id: number, status: string) =>
+      request<any>(`/performances/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+    remove: (id: number) => request<any>(`/performances/${id}`, { method: 'DELETE' }),
+    bindRole: (performanceId: number, roleId: number, castAssignment?: any) =>
+      request<any>(`/performances/${performanceId}/roles`, {
+        method: 'POST',
+        body: JSON.stringify({ roleId, castAssignment }),
+      }),
+    unbindRole: (performanceId: number, roleId: number) =>
+      request<any>(`/performances/${performanceId}/roles/${roleId}`, { method: 'DELETE' }),
+    updateRoleCast: (performanceId: number, roleId: number, castAssignment: any) =>
+      request<any>(`/performances/${performanceId}/roles/${roleId}/cast`, {
+        method: 'PUT',
+        body: JSON.stringify(castAssignment),
+      }),
+    bindMaterial: (performanceId: number, materialId: number) =>
+      request<any>(`/performances/${performanceId}/materials`, {
+        method: 'POST',
+        body: JSON.stringify({ materialId }),
+      }),
+    unbindMaterial: (performanceId: number, materialId: number) =>
+      request<any>(`/performances/${performanceId}/materials/${materialId}`, { method: 'DELETE' }),
+    getTags: () => request<string[]>('/performances/meta/tags'),
+    getVenues: () => request<string[]>('/performances/meta/venues'),
+    getTheaters: () => request<string[]>('/performances/meta/theaters'),
+  },
 };
