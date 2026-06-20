@@ -41,6 +41,13 @@ interface Rehearsal {
   lateCount?: number;
   pendingAttendanceCount?: number;
   effectiveParticipants?: number[];
+  tags?: any[];
+}
+
+interface TagInfo {
+  id: number;
+  name: string;
+  color: string;
 }
 
 interface MaterialLite {
@@ -109,6 +116,10 @@ export default function CalendarPage() {
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [materials, setMaterials] = useState<MaterialLite[]>([]);
+  const [availableTags, setAvailableTags] = useState<TagInfo[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>(
+    searchParams.get('tagIds') ? searchParams.get('tagIds')!.split(',').map(Number).filter(Boolean) : []
+  );
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -141,8 +152,34 @@ export default function CalendarPage() {
     if (filters.attendanceStatus) {
       params.attendanceStatus = filters.attendanceStatus;
     }
-    const data = await api.rehearsals.list(params);
-    setRehearsals(data);
+    let data = await api.rehearsals.list(params);
+
+    if (selectedTagIds.length > 0) {
+      try {
+        const filterResult = await api.tags.filterByTags(selectedTagIds, 'rehearsal');
+        const validIds = new Set(filterResult.targetIds);
+        data = data.filter((r: any) => validIds.has(r.id));
+      } catch {}
+    }
+
+    const rehearsalsWithTags = await Promise.all(
+      data.map(async (r: any) => {
+        try {
+          const tags = await api.tags.getTagsForTarget('rehearsal', r.id);
+          return { ...r, tags };
+        } catch {
+          return r;
+        }
+      })
+    );
+    setRehearsals(rehearsalsWithTags);
+  };
+
+  const loadTags = async () => {
+    try {
+      const data = await api.tags.list({ category: 'rehearsal' });
+      setAvailableTags(data);
+    } catch {}
   };
 
   const loadLastWeekRehearsals = async () => {
@@ -353,11 +390,12 @@ export default function CalendarPage() {
     load();
     loadUsers();
     loadMaterials();
+    loadTags();
   }, []);
 
   useEffect(() => {
     load();
-  }, [filters]);
+  }, [filters, selectedTagIds]);
 
   useEffect(() => {
     const rehearsalIdParam = searchParams.get('rehearsalId');
@@ -658,6 +696,25 @@ export default function CalendarPage() {
                         👥 {r.participantIds.map((id) => getUserName(id)).join('、')}
                       </div>
                     )}
+                    {r.tags && r.tags.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                        {r.tags.map((tag: any) => (
+                          <span
+                            key={tag.id}
+                            style={{
+                              padding: '2px 8px',
+                              background: `${tag.color}20`,
+                              border: `1px solid ${tag.color}40`,
+                              color: tag.color,
+                              borderRadius: 10,
+                              fontSize: 10,
+                            }}
+                          >
+                            {tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginLeft: 12 }}>
                     <button
@@ -774,6 +831,81 @@ export default function CalendarPage() {
               </div>
             </div>
           </div>
+
+          {availableTags.length > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #333' }}>
+              <div style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>
+                🏷️ 标签筛选 {selectedTagIds.length > 0 && <span style={{ color: '#3498db' }}>(已选 {selectedTagIds.length} 个)</span>}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {availableTags.map((tag) => {
+                  const selected = selectedTagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => {
+                        setSelectedTagIds((prev) =>
+                          selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]
+                        );
+                        const params = new URLSearchParams(searchParams);
+                        const newIds = selected
+                          ? selectedTagIds.filter((id) => id !== tag.id)
+                          : [...selectedTagIds, tag.id];
+                        if (newIds.length > 0) {
+                          params.set('tagIds', newIds.join(','));
+                        } else {
+                          params.delete('tagIds');
+                        }
+                        setSearchParams(params, { replace: true });
+                      }}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 14,
+                        border: `1px solid ${selected ? tag.color : '#444'}`,
+                        background: selected ? `${tag.color}20` : 'transparent',
+                        color: selected ? tag.color : '#aaa',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: tag.color,
+                      }} />
+                      {tag.name}
+                    </button>
+                  );
+                })}
+                {selectedTagIds.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSelectedTagIds([]);
+                      const params = new URLSearchParams(searchParams);
+                      params.delete('tagIds');
+                      setSearchParams(params, { replace: true });
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 14,
+                      border: '1px solid #555',
+                      background: 'transparent',
+                      color: '#888',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    清除
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid #333' }}>
             <div style={{ color: '#666', fontSize: 13 }}>
               当前筛选结果：<span style={{ color: '#3498db' }}>{filteredRehearsals.length}</span> 条排练

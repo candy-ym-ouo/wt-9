@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { path: '/annotations', label: '文本批注', icon: '📝' },
   { path: '/materials', label: '素材上传', icon: '📁' },
   { path: '/search', label: '检索', icon: '🔍' },
+  { path: '/tags', label: '标签中心', icon: '🏷️' },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

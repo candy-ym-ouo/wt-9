@@ -511,4 +511,43 @@ export const api = {
     revokePermission: (dramaId: number, userId: number) =>
       request<any>(`/dramas/${dramaId}/permissions/${userId}`, { method: 'DELETE' }),
   },
+  tags: {
+    list: (params?: { dramaId?: number; category?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.dramaId) searchParams.set('dramaId', String(params.dramaId));
+      if (params?.category) searchParams.set('category', params.category);
+      const q = searchParams.toString();
+      return request<any[]>(`/tags${q ? '?' + q : ''}`);
+    },
+    get: (id: number) => request<any>(`/tags/detail/${id}`),
+    create: (data: { name: string; color?: string; categories?: string[]; dramaId?: number }) =>
+      request<any>('/tags', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<{ name: string; color: string; categories: string[] }>) =>
+      request<any>(`/tags/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => request<any>(`/tags/${id}`, { method: 'DELETE' }),
+    attach: (data: { tagIds: number[]; targetType: string; targetId: number; dramaId?: number }) =>
+      request<any>('/tags/attach', { method: 'POST', body: JSON.stringify(data) }),
+    batchAttach: (data: { items: Array<{ tagIds: number[]; targetType: string; targetId: number }>; dramaId?: number }) =>
+      request<any>('/tags/batch-attach', { method: 'POST', body: JSON.stringify(data) }),
+    detach: (data: { tagId: number; targetType: string; targetId: number }) =>
+      request<any>('/tags/detach', { method: 'DELETE', body: JSON.stringify(data) }),
+    getTagsForTarget: (targetType: string, targetId: number) =>
+      request<any[]>(`/tags/${targetType}/${targetId}`),
+    getTargetsForTag: (tagId: number, targetType?: string) => {
+      const params = targetType ? `?targetType=${targetType}` : '';
+      return request<any[]>(`/tags/targets/${tagId}${params}`);
+    },
+    filterByTags: (tagIds: number[], targetType: string, dramaId?: number) => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('tagIds', tagIds.join(','));
+      searchParams.set('targetType', targetType);
+      if (dramaId) searchParams.set('dramaId', String(dramaId));
+      const q = searchParams.toString();
+      return request<{ targetType: string; targetIds: number[] }>(`/tags/filter?${q}`);
+    },
+    getStatistics: (dramaId?: number) => {
+      const params = dramaId ? `?dramaId=${dramaId}` : '';
+      return request<any>(`/tags/statistics${params}`);
+    },
+  },
 };

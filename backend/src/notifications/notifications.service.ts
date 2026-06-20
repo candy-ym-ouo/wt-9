@@ -13,6 +13,7 @@ import {
   Annotation,
   LeaveRequest,
   LeaveType,
+  CastRole,
 } from '../entities';
 
 export interface CreateNotificationDto {
@@ -26,6 +27,7 @@ export interface CreateNotificationDto {
   rehearsalId?: number;
   materialId?: number;
   annotationId?: number;
+  roleId?: number;
   leaveId?: number;
   senderId?: number;
   expiresAt?: Date;
@@ -60,6 +62,8 @@ export class NotificationsService {
     private materialRepo: Repository<Material>,
     @InjectRepository(Annotation)
     private annotationRepo: Repository<Annotation>,
+    @InjectRepository(CastRole)
+    private roleRepo: Repository<CastRole>,
   ) {}
 
   async create(dto: CreateNotificationDto): Promise<Notification[]> {
@@ -549,6 +553,102 @@ export class NotificationsService {
     });
   }
 
+  async notifyRoleChange(
+    roleId: number,
+    action: 'created' | 'updated' | 'deleted',
+    changes?: string[],
+    targetUserIds?: number[],
+    senderId?: number,
+  ): Promise<Notification[]> {
+    const role = await this.roleRepo.findOne({ where: { id: roleId } });
+    if (!role && action !== 'deleted') {
+      throw new NotFoundException('角色不存在');
+    }
+
+    let title = '';
+    let message = '';
+    let priority = NotificationPriority.MEDIUM;
+
+    switch (action) {
+      case 'created':
+        title = '新角色创建';
+        message = `新角色「${role!.characterName}」已创建`;
+        break;
+      case 'updated':
+        title = '角色更新通知';
+        const changeDetails = changes && changes.length > 0 ? `\n变更内容：${changes.join('；')}` : '';
+        message = `角色「${role!.characterName}」已更新${changeDetails}`;
+        priority = NotificationPriority.HIGH;
+        break;
+      case 'deleted':
+        title = '角色删除通知';
+        message = `角色已被删除`;
+        priority = NotificationPriority.URGENT;
+        break;
+    }
+
+    return this.create({
+      type: NotificationType.ROLE_CHANGE,
+      title,
+      message,
+      priority,
+      targetUserIds,
+      roleId,
+      senderId,
+      metadata: { action, changes, role },
+    });
+  }
+
+  async notifyAnnotationUpdate(
+    annotationId: number,
+    action: 'created' | 'updated' | 'deleted',
+    targetUserIds?: number[],
+    senderId?: number,
+    replierName?: string,
+  ): Promise<Notification[]> {
+    const annotation = await this.annotationRepo.findOne({ where: { id: annotationId } });
+    if (!annotation && action !== 'deleted') {
+      throw new NotFoundException('批注不存在');
+    }
+
+    let title = '';
+    let message = '';
+    let priority = NotificationPriority.MEDIUM;
+
+    const contentPreview = annotation
+      ? annotation.scriptContent.length > 50
+        ? annotation.scriptContent.substring(0, 50) + '...'
+        : annotation.scriptContent
+      : '';
+
+    switch (action) {
+      case 'created':
+        title = '新批注创建';
+        message = `新批注已创建\n内容：${contentPreview}`;
+        break;
+      case 'updated':
+        title = '批注更新通知';
+        message = `${replierName || '有人'}更新了批注\n内容：${contentPreview}`;
+        priority = NotificationPriority.HIGH;
+        break;
+      case 'deleted':
+        title = '批注删除通知';
+        message = `批注已被删除`;
+        break;
+    }
+
+    return this.create({
+      type: NotificationType.ANNOTATION_UPDATE,
+      title,
+      message,
+      priority,
+      targetUserIds,
+      annotationId,
+      senderId,
+      metadata: { action, annotation, replierName },
+    });
+  }
+
   private formatFileSize(bytes: number): string {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
@@ -560,6 +660,9 @@ export class NotificationsService {
       { value: NotificationType.REHEARSAL_CHANGE, label: '排练变更' },
       { value: NotificationType.MATERIAL_UPDATE, label: '素材更新' },
       { value: NotificationType.ANNOTATION_REPLY, label: '批注回复' },
+      { value: NotificationType.ROLE_CHANGE, label: '角色变更' },
+      { value: NotificationType.ANNOTATION_UPDATE, label: '批注更新' },
+      { value: NotificationType.SUBSCRIPTION_UPDATE, label: '订阅更新' },
       { value: NotificationType.SYSTEM_ANNOUNCEMENT, label: '系统公告' },
       { value: NotificationType.LEAVE_SUBMITTED, label: '请假申请提交' },
       { value: NotificationType.LEAVE_APPROVED, label: '请假申请批准' },

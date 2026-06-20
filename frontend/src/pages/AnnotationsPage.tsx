@@ -8,6 +8,12 @@ interface TagInfo {
   color: string | null;
 }
 
+interface SystemTagInfo {
+  id: number;
+  name: string;
+  color: string;
+}
+
 interface Annotation {
   id: number;
   scriptContent: string;
@@ -22,6 +28,7 @@ interface Annotation {
   updatedAt: string;
   materialIds?: number[];
   highlights?: { field: string; start: number; end: number }[];
+  systemTags?: SystemTagInfo[];
 }
 
 interface SceneGroup {
@@ -121,6 +128,10 @@ export default function AnnotationsPage() {
   const [groupedData, setGroupedData] = useState<GroupedResult | null>(null);
   const [materials, setMaterials] = useState<MaterialLite[]>([]);
   const [availableTags, setAvailableTags] = useState<TagInfo[]>([]);
+  const [systemTags, setSystemTags] = useState<SystemTagInfo[]>([]);
+  const [selectedSystemTagIds, setSelectedSystemTagIds] = useState<number[]>(
+    searchParams.get('tagIds') ? searchParams.get('tagIds')!.split(',').map(Number).filter(Boolean) : []
+  );
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || saved?.searchQuery || '');
   const [selectedTags, setSelectedTags] = useState<string[]>(
     searchParams.get('tags') ? searchParams.get('tags')!.split(',') : saved?.selectedTags || []
@@ -177,11 +188,57 @@ export default function AnnotationsPage() {
 
   const loadGrouped = async (query?: string) => {
     try {
-      const data = await api.annotations.listGroupedByScene(query);
+      let data = await api.annotations.listGroupedByScene(query);
+
+      if (selectedSystemTagIds.length > 0) {
+        try {
+          const filterResult = await api.tags.filterByTags(selectedSystemTagIds, 'annotation');
+          const validIds = new Set(filterResult.targetIds);
+          data = {
+            ...data,
+            groups: data.groups.map((g: any) => ({
+              ...g,
+              annotations: g.annotations.filter((a: any) => validIds.has(a.id)),
+              count: g.annotations.filter((a: any) => validIds.has(a.id)).length,
+            })).filter((g: any) => g.count > 0),
+            totalCount: data.groups.reduce((sum: number, g: any) => sum + g.annotations.filter((a: any) => validIds.has(a.id)).length, 0),
+            sceneCount: data.groups.filter((g: any) => g.annotations.filter((a: any) => validIds.has(a.id)).length > 0).length,
+          };
+        } catch {}
+      }
+
+      const allAnnotations = data.groups.flatMap((g: any) => g.annotations);
+      const annotationsWithTags = await Promise.all(
+        allAnnotations.map(async (a: any) => {
+          try {
+            const tags = await api.tags.getTagsForTarget('annotation', a.id);
+            return { ...a, systemTags: tags };
+          } catch {
+            return a;
+          }
+        })
+      );
+
+      const annotationMap = new Map(annotationsWithTags.map((a: any) => [a.id, a]));
+      data = {
+        ...data,
+        groups: data.groups.map((g: any) => ({
+          ...g,
+          annotations: g.annotations.map((a: any) => annotationMap.get(a.id) || a),
+        })),
+      };
+
       setGroupedData(data);
     } catch (e) {
       console.error('加载批注分组失败', e);
     }
+  };
+
+  const loadSystemTags = async () => {
+    try {
+      const data = await api.tags.list({ category: 'annotation' });
+      setSystemTags(data);
+    } catch {}
   };
 
   const loadMaterials = async () => {
@@ -206,6 +263,7 @@ export default function AnnotationsPage() {
     loadGrouped();
     loadMaterials();
     loadTags();
+    loadSystemTags();
   }, []);
 
   useEffect(() => {
@@ -214,7 +272,7 @@ export default function AnnotationsPage() {
       syncUrlParams();
     }, 300);
     return () => clearTimeout(handler);
-  }, [searchQuery]);
+  }, [searchQuery, selectedSystemTagIds]);
 
   useEffect(() => {
     saveFilterState({ searchQuery, selectedTags, activeScene, viewMode });
@@ -765,6 +823,21 @@ export default function AnnotationsPage() {
                       {a.tag}
                     </span>
                   )}
+                  {a.systemTags && a.systemTags.length > 0 && a.systemTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      style={{
+                        background: `${tag.color}20`,
+                        border: `1px solid ${tag.color}40`,
+                        color: tag.color,
+                        padding: '2px 8px',
+                        borderRadius: 10,
+                        fontSize: 11,
+                      }}
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
                   {a.sceneNumber && (
                     <span
                       onClick={() => jumpToScene(a.sceneNumber)}
@@ -1100,6 +1173,81 @@ export default function AnnotationsPage() {
               );
             })}
           </div>
+
+          {systemTags.length > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #333' }}>
+              <div style={{ fontSize: 13, color: '#aaa', marginBottom: 8 }}>
+                🏷️ 统一标签 {selectedSystemTagIds.length > 0 && <span style={{ color: '#3498db' }}>(已选 {selectedSystemTagIds.length} 个)</span>}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {systemTags.map((tag) => {
+                  const selected = selectedSystemTagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => {
+                        setSelectedSystemTagIds((prev) =>
+                          selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]
+                        );
+                        const params = new URLSearchParams(searchParams);
+                        const newIds = selected
+                          ? selectedSystemTagIds.filter((id) => id !== tag.id)
+                          : [...selectedSystemTagIds, tag.id];
+                        if (newIds.length > 0) {
+                          params.set('tagIds', newIds.join(','));
+                        } else {
+                          params.delete('tagIds');
+                        }
+                        setSearchParams(params, { replace: true });
+                      }}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 14,
+                        border: `1px solid ${selected ? tag.color : '#444'}`,
+                        background: selected ? `${tag.color}20` : 'transparent',
+                        color: selected ? tag.color : '#aaa',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: tag.color,
+                      }} />
+                      {tag.name}
+                    </button>
+                  );
+                })}
+                {selectedSystemTagIds.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSelectedSystemTagIds([]);
+                      const params = new URLSearchParams(searchParams);
+                      params.delete('tagIds');
+                      setSearchParams(params, { replace: true });
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 14,
+                      border: '1px solid #555',
+                      background: 'transparent',
+                      color: '#888',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    清除
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

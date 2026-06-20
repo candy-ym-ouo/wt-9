@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Annotation, AnnotationVersion, VersionAction, UserRole, Material, User, AuditAction, AuditModule } from '../entities';
+import { Annotation, AnnotationVersion, VersionAction, UserRole, Material, User, AuditAction, AuditModule, SubscriptionTargetType } from '../entities';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DramasService } from '../dramas/dramas.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Injectable()
 export class AnnotationsService {
@@ -18,8 +19,11 @@ export class AnnotationsService {
     @InjectRepository(User)
     private userRepo: Repository<User>,
     private notificationsService: NotificationsService,
+    @Inject(forwardRef(() => DramasService))
     private dramasService: DramasService,
     private auditLogsService: AuditLogsService,
+    @Inject(forwardRef(() => SubscriptionsService))
+    private subscriptionsService: SubscriptionsService,
   ) {}
 
   private async createVersion(
@@ -93,6 +97,31 @@ export class AnnotationsService {
         replierName,
       ).catch(() => {});
     }
+
+    const contentPreview = saved.scriptContent.length > 50
+      ? saved.scriptContent.substring(0, 50) + '...'
+      : saved.scriptContent;
+
+    const targetUserIds = saved.createdBy && saved.createdBy !== userId ? [saved.createdBy] : [];
+    if (targetUserIds.length > 0) {
+      this.notificationsService.notifyAnnotationUpdate(
+        saved.id,
+        'created',
+        targetUserIds,
+        userId,
+        username,
+      ).catch(() => {});
+    }
+
+    this.subscriptionsService.notifySubscribers(
+      SubscriptionTargetType.ANNOTATION,
+      saved.id,
+      'created',
+      '新批注创建',
+      `新批注已创建\n内容：${contentPreview}`,
+      { annotation: saved, dramaId },
+      userId,
+    ).catch(() => {});
 
     return saved;
   }
@@ -244,6 +273,31 @@ export class AnnotationsService {
       ).catch(() => {});
     }
 
+    const contentPreview = annotation.scriptContent.length > 50
+      ? annotation.scriptContent.substring(0, 50) + '...'
+      : annotation.scriptContent;
+
+    const targetUserIds = annotation.createdBy && annotation.createdBy !== userId ? [annotation.createdBy] : [];
+    if (targetUserIds.length > 0) {
+      this.notificationsService.notifyAnnotationUpdate(
+        id,
+        'updated',
+        targetUserIds,
+        userId,
+        username,
+      ).catch(() => {});
+    }
+
+    this.subscriptionsService.notifySubscribers(
+      SubscriptionTargetType.ANNOTATION,
+      id,
+      'updated',
+      '批注更新通知',
+      `${username}更新了批注\n内容：${contentPreview}`,
+      { old: annotation, new: data, dramaId: annotation.dramaId },
+      userId,
+    ).catch(() => {});
+
     return this.repo.findOne({ where: { id } });
   }
 
@@ -314,6 +368,27 @@ export class AnnotationsService {
       detail: `删除批注 #${id}`,
       metadata: { dramaId: annotation.dramaId, tag: annotation.tag, sceneNumber: annotation.sceneNumber },
     });
+
+    const targetUserIds = annotation.createdBy && annotation.createdBy !== userId ? [annotation.createdBy] : [];
+    if (targetUserIds.length > 0) {
+      this.notificationsService.notifyAnnotationUpdate(
+        id,
+        'deleted',
+        targetUserIds,
+        userId,
+        username,
+      ).catch(() => {});
+    }
+
+    this.subscriptionsService.notifySubscribers(
+      SubscriptionTargetType.ANNOTATION,
+      id,
+      'deleted',
+      '批注删除通知',
+      `批注已被删除`,
+      { annotation, dramaId: annotation.dramaId },
+      userId,
+    ).catch(() => {});
 
     return this.repo.delete(id);
   }

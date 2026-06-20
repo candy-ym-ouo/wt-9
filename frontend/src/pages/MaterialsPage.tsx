@@ -26,6 +26,13 @@ interface Material {
   baseName: string;
   referenceCount?: { rehearsals: number; annotations: number; total: number };
   references?: MaterialReference[];
+  systemTags?: TagInfo[];
+}
+
+interface TagInfo {
+  id: number;
+  name: string;
+  color: string;
 }
 
 interface DuplicateMaterial {
@@ -55,6 +62,10 @@ export default function MaterialsPage() {
   const [keyword, setKeyword] = useState(urlQ);
   const [availableCategories, setAvailableCategories] = useState<string[]>(PRESET_CATEGORIES);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [systemTags, setSystemTags] = useState<TagInfo[]>([]);
+  const [selectedSystemTagIds, setSelectedSystemTagIds] = useState<number[]>(
+    searchParams.get('tagIds') ? searchParams.get('tagIds')!.split(',').map(Number).filter(Boolean) : []
+  );
 
   const [uploadCategories, setUploadCategories] = useState<string[]>(['general']);
   const [uploadTags, setUploadTags] = useState('');
@@ -84,17 +95,43 @@ export default function MaterialsPage() {
     } catch {}
   };
 
+  const loadSystemTags = async () => {
+    try {
+      const data = await api.tags.list({ category: 'material' });
+      setSystemTags(data);
+    } catch {}
+  };
+
   const load = async () => {
-    const data = await api.materials.list({
+    let data = await api.materials.list({
       categories: filterCats.length > 0 ? filterCats.join(',') : undefined,
       tags: filterTags.length > 0 ? filterTags.join(',') : undefined,
       keyword: keyword || undefined,
     });
-    setMaterials(data);
+
+    if (selectedSystemTagIds.length > 0) {
+      try {
+        const filterResult = await api.tags.filterByTags(selectedSystemTagIds, 'material');
+        const validIds = new Set(filterResult.targetIds);
+        data = data.filter((m: any) => validIds.has(m.id));
+      } catch {}
+    }
+
+    const materialsWithTags = await Promise.all(
+      data.map(async (m: any) => {
+        try {
+          const tags = await api.tags.getTagsForTarget('material', m.id);
+          return { ...m, systemTags: tags };
+        } catch {
+          return m;
+        }
+      })
+    );
+    setMaterials(materialsWithTags);
   };
 
-  useEffect(() => { loadMeta(); }, []);
-  useEffect(() => { load(); }, [filterCats, filterTags, keyword]);
+  useEffect(() => { loadMeta(); loadSystemTags(); }, []);
+  useEffect(() => { load(); }, [filterCats, filterTags, keyword, selectedSystemTagIds]);
 
   const syncUrlParams = () => {
     const params = new URLSearchParams(searchParams);
@@ -391,6 +428,81 @@ export default function MaterialsPage() {
             </div>
           </>
         )}
+
+        {systemTags.length > 0 && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #333' }}>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>
+              🏷️ 统一标签筛选 {selectedSystemTagIds.length > 0 && <span style={{ color: '#3498db' }}>(已选 {selectedSystemTagIds.length} 个)</span>}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {systemTags.map((tag) => {
+                const selected = selectedSystemTagIds.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    onClick={() => {
+                      setSelectedSystemTagIds((prev) =>
+                        selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]
+                      );
+                      const params = new URLSearchParams(searchParams);
+                      const newIds = selected
+                        ? selectedSystemTagIds.filter((id) => id !== tag.id)
+                        : [...selectedSystemTagIds, tag.id];
+                      if (newIds.length > 0) {
+                        params.set('tagIds', newIds.join(','));
+                      } else {
+                        params.delete('tagIds');
+                      }
+                      setSearchParams(params, { replace: true });
+                    }}
+                    style={{
+                      padding: '4px 12px',
+                      borderRadius: 14,
+                      border: `1px solid ${selected ? tag.color : '#444'}`,
+                      background: selected ? `${tag.color}20` : 'transparent',
+                      color: selected ? tag.color : '#aaa',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: tag.color,
+                    }} />
+                    {tag.name}
+                  </button>
+                );
+              })}
+              {selectedSystemTagIds.length > 0 && (
+                <button
+                  onClick={() => {
+                    setSelectedSystemTagIds([]);
+                    const params = new URLSearchParams(searchParams);
+                    params.delete('tagIds');
+                    setSearchParams(params, { replace: true });
+                  }}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 14,
+                    border: '1px solid #555',
+                    background: 'transparent',
+                    color: '#888',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  清除
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 12 }}>
           <input
             placeholder="搜索关键词..."
@@ -512,6 +624,25 @@ export default function MaterialsPage() {
                     <span key={t} style={{ ...tagStyle, background: '#1a2a3a', color: '#3498db', border: '1px solid #2a3a5a' }}>#{t}</span>
                   ))}
                 </div>
+                {m.systemTags && m.systemTags.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                    {m.systemTags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        style={{
+                          padding: '2px 8px',
+                          background: `${tag.color}20`,
+                          border: `1px solid ${tag.color}40`,
+                          color: tag.color,
+                          borderRadius: 10,
+                          fontSize: 10,
+                        }}
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {m.description && (
                   <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>{m.description}</div>
                 )}
@@ -723,6 +854,25 @@ export default function MaterialsPage() {
                 <span key={t} style={{ ...tagStyle, background: '#1a2a3a', color: '#3498db', border: '1px solid #2a3a5a' }}>#{t}</span>
               ))}
             </div>
+            {detailMaterial.systemTags && detailMaterial.systemTags.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+                {detailMaterial.systemTags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    style={{
+                      padding: '2px 8px',
+                      background: `${tag.color}20`,
+                      border: `1px solid ${tag.color}40`,
+                      color: tag.color,
+                      borderRadius: 10,
+                      fontSize: 11,
+                    }}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {detailMaterial.downloadRoles && detailMaterial.downloadRoles.length > 0 && (
               <div style={{ fontSize: 12, color: '#f39c12', marginBottom: 12 }}>

@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { CastRole, User, Rehearsal, AuditAction, AuditModule } from '../entities';
+import { CastRole, User, Rehearsal, AuditAction, AuditModule, SubscriptionTargetType } from '../entities';
 import { LeavesService } from '../leaves/leaves.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { DramasService } from '../dramas/dramas.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class RolesService {
@@ -17,7 +19,11 @@ export class RolesService {
     private rehearsalRepo: Repository<Rehearsal>,
     private leavesService: LeavesService,
     private auditLogsService: AuditLogsService,
+    @Inject(forwardRef(() => DramasService))
     private dramasService: DramasService,
+    @Inject(forwardRef(() => SubscriptionsService))
+    private subscriptionsService: SubscriptionsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(
@@ -44,6 +50,29 @@ export class RolesService {
       detail: `在剧目 #${dramaId} 创建角色「${saved.characterName}」`,
       metadata: { characterName: saved.characterName, actorId: saved.actorId, dramaId },
     });
+
+    const targetUserIds: number[] = [];
+    if (saved.actorId) targetUserIds.push(saved.actorId);
+    (saved.substituteActorIds || []).forEach((id) => targetUserIds.push(id));
+    if (targetUserIds.length > 0) {
+      this.notificationsService.notifyRoleChange(
+        saved.id,
+        'created',
+        undefined,
+        targetUserIds,
+        operatorId,
+      ).catch(() => {});
+    }
+
+    this.subscriptionsService.notifySubscribers(
+      SubscriptionTargetType.ROLE,
+      saved.id,
+      'created',
+      '新角色创建',
+      `角色「${saved.characterName}」已创建${saved.actorId ? '\n饰演演员：已分配' : ''}`,
+      { role: saved, dramaId },
+      operatorId,
+    ).catch(() => {});
 
     return this.findOne(saved.id, operatorId);
   }
@@ -164,6 +193,32 @@ export class RolesService {
           : `更新角色「${oldRole.characterName}」`,
         metadata: { old: oldRole, new: data, dramaId: oldRole.dramaId },
       });
+
+      const targetUserIds: number[] = [];
+      if (data.actorId !== undefined) targetUserIds.push(data.actorId);
+      if (oldRole.actorId && oldRole.actorId !== data.actorId) targetUserIds.push(oldRole.actorId);
+      (oldRole.substituteActorIds || []).forEach((id) => targetUserIds.push(id));
+      (data.substituteActorIds || []).forEach((id) => targetUserIds.push(id));
+      const uniqueTargetIds = Array.from(new Set(targetUserIds));
+      if (uniqueTargetIds.length > 0) {
+        this.notificationsService.notifyRoleChange(
+          id,
+          'updated',
+          changes.length > 0 ? changes : undefined,
+          uniqueTargetIds,
+          operatorId,
+        ).catch(() => {});
+      }
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.ROLE,
+        id,
+        'updated',
+        '角色更新通知',
+        `角色「${oldRole.characterName}」已更新${changes.length > 0 ? '\n变更内容：' + changes.join('；') : ''}`,
+        { old: oldRole, new: data, changes, dramaId: oldRole.dramaId },
+        operatorId,
+      ).catch(() => {});
     }
 
     return updated;
@@ -187,6 +242,29 @@ export class RolesService {
         detail: `删除角色「${role.characterName}」`,
         metadata: { characterName: role.characterName, actorId: role.actorId, dramaId: role.dramaId },
       });
+
+      const targetUserIds: number[] = [];
+      if (role.actorId) targetUserIds.push(role.actorId);
+      (role.substituteActorIds || []).forEach((uid) => targetUserIds.push(uid));
+      if (targetUserIds.length > 0) {
+        this.notificationsService.notifyRoleChange(
+          id,
+          'deleted',
+          undefined,
+          targetUserIds,
+          operatorId,
+        ).catch(() => {});
+      }
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.ROLE,
+        id,
+        'deleted',
+        '角色删除通知',
+        `角色「${role.characterName}」已被删除`,
+        { role, dramaId: role.dramaId },
+        operatorId,
+      ).catch(() => {});
     }
     return this.repo.delete(id);
   }

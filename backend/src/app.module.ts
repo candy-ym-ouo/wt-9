@@ -35,6 +35,7 @@ import {
   Approval,
   Tag,
   TagRelation,
+  Subscription,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -61,6 +62,7 @@ import { ReportsModule } from './reports/reports.module';
 import { DramasModule } from './dramas/dramas.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { TagsModule } from './tags/tags.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -102,6 +104,7 @@ import { TagsModule } from './tags/tags.module';
         Approval,
         Tag,
         TagRelation,
+        Subscription,
       ],
       synchronize: true,
     }),
@@ -130,6 +133,7 @@ import { TagsModule } from './tags/tags.module';
     ReportsModule,
     ApprovalsModule,
     TagsModule,
+    SubscriptionsModule,
   ],
 })
 export class AppModule {}

@@ -1,11 +1,12 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, Not, In } from 'typeorm';
-import { Rehearsal, User, CastRole, LeaveRequest, LeaveStatus, Material, AuditAction, AuditModule } from '../entities';
+import { Rehearsal, User, CastRole, LeaveRequest, Material, AuditAction, AuditModule, SubscriptionTargetType } from '../entities';
 import { LeavesService } from '../leaves/leaves.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DramasService } from '../dramas/dramas.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 export interface ConflictInfo {
   hasConflict: boolean;
@@ -73,7 +74,10 @@ export class RehearsalsService {
     private leavesService: LeavesService,
     private auditLogsService: AuditLogsService,
     private notificationsService: NotificationsService,
+    @Inject(forwardRef(() => DramasService))
     private dramasService: DramasService,
+    @Inject(forwardRef(() => SubscriptionsService))
+    private subscriptionsService: SubscriptionsService,
   ) {}
 
   async checkConflicts(
@@ -226,6 +230,16 @@ export class RehearsalsService {
         saved.id,
         'created',
         undefined,
+        operatorId,
+      ).catch(() => {});
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.REHEARSAL,
+        saved.id,
+        'created',
+        '新排练通知',
+        `排练「${saved.title}」已创建\n时间：${timeStr}\n地点：${saved.location || '待定'}`,
+        { rehearsal: saved, dramaId },
         operatorId,
       ).catch(() => {});
     }
@@ -456,6 +470,16 @@ export class RehearsalsService {
         changes.length > 0 ? changes : undefined,
         operatorId,
       ).catch(() => {});
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.REHEARSAL,
+        id,
+        'updated',
+        '排练变更通知',
+        `排练「${existing.title}」已更新${changes.length > 0 ? '\n变更内容：' + changes.join('；') : ''}`,
+        { old: existing, new: data, changes, dramaId: existing.dramaId },
+        operatorId,
+      ).catch(() => {});
     }
 
     return this.repo.findOne({ where: { id } });
@@ -490,6 +514,16 @@ export class RehearsalsService {
         id,
         'deleted',
         undefined,
+        operatorId,
+      ).catch(() => {});
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.REHEARSAL,
+        id,
+        'deleted',
+        '排练取消通知',
+        `排练「${rehearsal.title}」已被取消`,
+        { rehearsal, dramaId: rehearsal.dramaId },
         operatorId,
       ).catch(() => {});
     }

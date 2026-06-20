@@ -6,13 +6,14 @@ import {
   Rehearsal,
   Material,
   Annotation,
+  CastRole,
 } from '../entities';
 import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Notification, User, Rehearsal, Material, Annotation]),
+    TypeOrmModule.forFeature([Notification, User, Rehearsal, Material, Annotation, CastRole]),
   ],
   providers: [NotificationsService],
   controllers: [NotificationsController],

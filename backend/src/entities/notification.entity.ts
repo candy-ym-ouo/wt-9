@@ -10,6 +10,9 @@ export enum NotificationType {
   LEAVE_APPROVED = 'leave_approved',
   LEAVE_REJECTED = 'leave_rejected',
   LEAVE_SUBSTITUTE_ASSIGNED = 'leave_substitute_assigned',
+  ROLE_CHANGE = 'role_change',
+  ANNOTATION_UPDATE = 'annotation_update',
+  SUBSCRIPTION_UPDATE = 'subscription_update',
 }
 
 export enum NotificationStatus {
@@ -62,6 +65,9 @@ export class Notification {
 
   @Column({ nullable: true })
   annotationId: number;
+
+  @Column({ nullable: true })
+  roleId: number;
 
   @Column({ nullable: true })
   leaveId: number;

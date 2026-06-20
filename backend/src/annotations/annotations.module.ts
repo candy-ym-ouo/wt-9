@@ -7,6 +7,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { DramasModule } from '../dramas/dramas.module';
 import { TagsModule } from '../tags/tags.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { TagsModule } from '../tags/tags.module';
     forwardRef(() => AuditLogsModule),
     forwardRef(() => DramasModule),
     forwardRef(() => TagsModule),
+    forwardRef(() => SubscriptionsModule),
   ],
   providers: [AnnotationsService],
   controllers: [AnnotationsController],

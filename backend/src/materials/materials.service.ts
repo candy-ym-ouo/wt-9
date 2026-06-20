@@ -1,10 +1,11 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Material, Rehearsal, Annotation, AuditAction, AuditModule } from '../entities';
+import { Material, Rehearsal, Annotation, AuditAction, AuditModule, SubscriptionTargetType } from '../entities';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DramasService } from '../dramas/dramas.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { extname, join } from 'path';
 import { unlinkSync, existsSync } from 'fs';
 
@@ -38,7 +39,10 @@ export class MaterialsService {
     private annotationRepo: Repository<Annotation>,
     private auditLogsService: AuditLogsService,
     private notificationsService: NotificationsService,
+    @Inject(forwardRef(() => DramasService))
     private dramasService: DramasService,
+    @Inject(forwardRef(() => SubscriptionsService))
+    private subscriptionsService: SubscriptionsService,
   ) {}
 
   async checkDuplicate(filename: string, dramaId?: number): Promise<DuplicateCheckResult> {
@@ -151,6 +155,16 @@ export class MaterialsService {
         'created',
         operatorId,
       ).catch(() => {});
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.MATERIAL,
+        saved.id,
+        'created',
+        '新素材上传',
+        `新素材「${saved.originalName}」已上传\n类型：${saved.mimeType}\n大小：${this.formatFileSize(saved.size)}`,
+        { material: saved, dramaId },
+        operatorId,
+      ).catch(() => {});
     }
 
     return saved;
@@ -212,6 +226,16 @@ export class MaterialsService {
       this.notificationsService.notifyMaterialUpdate(
         saved.id,
         'new_version',
+        operatorId,
+      ).catch(() => {});
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.MATERIAL,
+        saved.id,
+        'updated',
+        '素材新版本',
+        `素材「${saved.originalName}」已更新到 v${saved.version}`,
+        { material: saved, dramaId, isNewVersion: true },
         operatorId,
       ).catch(() => {});
     }
@@ -278,6 +302,16 @@ export class MaterialsService {
       this.notificationsService.notifyMaterialUpdate(
         saved.id,
         'updated',
+        operatorId,
+      ).catch(() => {});
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.MATERIAL,
+        saved.id,
+        'updated',
+        '素材更新通知',
+        `素材「${saved.originalName}」已更新`,
+        { material: saved, dramaId: existing.dramaId, isOverwrite: true },
         operatorId,
       ).catch(() => {});
     }
@@ -474,6 +508,16 @@ export class MaterialsService {
         'updated',
         operatorId,
       ).catch(() => {});
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.MATERIAL,
+        id,
+        'updated',
+        '素材更新通知',
+        `素材「${oldMaterial.originalName}」已更新${changes.length > 0 ? '\n变更内容：' + changes.join('；') : ''}`,
+        { old: oldMaterial, new: data, changes, dramaId: oldMaterial.dramaId },
+        operatorId,
+      ).catch(() => {});
     }
 
     return updated;
@@ -517,9 +561,25 @@ export class MaterialsService {
         'deleted',
         operatorId,
       ).catch(() => {});
+
+      this.subscriptionsService.notifySubscribers(
+        SubscriptionTargetType.MATERIAL,
+        id,
+        'deleted',
+        '素材删除通知',
+        `素材「${material.originalName}」已被删除`,
+        { material, dramaId: material.dramaId },
+        operatorId,
+      ).catch(() => {});
     }
 
     return this.repo.delete(id);
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   }
 
   async getAllCategories(dramaId: number | undefined, userId: number): Promise<string[]> {

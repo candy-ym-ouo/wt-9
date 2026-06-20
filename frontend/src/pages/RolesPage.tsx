@@ -22,6 +22,13 @@ interface CastRole {
   currentSubstitute?: any;
   sceneNumbers: number[];
   priority: number;
+  tags?: any[];
+}
+
+interface TagInfo {
+  id: number;
+  name: string;
+  color: string;
 }
 
 export default function RolesPage() {
@@ -31,6 +38,10 @@ export default function RolesPage() {
 
   const [roles, setRoles] = useState<CastRole[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [availableTags, setAvailableTags] = useState<TagInfo[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>(
+    searchParams.get('tagIds') ? searchParams.get('tagIds')!.split(',').map(Number).filter(Boolean) : []
+  );
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     characterName: '',
@@ -48,13 +59,46 @@ export default function RolesPage() {
   const { isDirector, isAdmin } = useAuth();
   const canEdit = isDirector || isAdmin;
 
+  const loadTags = async () => {
+    try {
+      const data = await api.tags.list({ category: 'role' });
+      setAvailableTags(data);
+    } catch {}
+  };
+
+  const loadRolesWithTags = async (roleList: CastRole[]) => {
+    const rolesWithTags = await Promise.all(
+      roleList.map(async (role) => {
+        try {
+          const tags = await api.tags.getTagsForTarget('role', role.id);
+          return { ...role, tags };
+        } catch {
+          return role;
+        }
+      })
+    );
+    return rolesWithTags;
+  };
+
   const load = async () => {
     const [rolesData, usersData] = await Promise.all([api.roles.list(), api.users.list()]);
-    setRoles(rolesData);
+    let filteredRoles = rolesData;
+
+    if (selectedTagIds.length > 0) {
+      try {
+        const filterResult = await api.tags.filterByTags(selectedTagIds, 'role');
+        const validIds = new Set(filterResult.targetIds);
+        filteredRoles = rolesData.filter((r: any) => validIds.has(r.id));
+      } catch {}
+    }
+
+    const rolesWithTags = await loadRolesWithTags(filteredRoles);
+    setRoles(rolesWithTags);
     setUsers(usersData);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { loadTags(); }, []);
+  useEffect(() => { load(); }, [selectedTagIds]);
 
   const filteredRoles = useMemo(() => {
     if (!keyword.trim()) return roles;
@@ -269,24 +313,106 @@ export default function RolesPage() {
       </div>
 
       {!sortMode && (
-        <input
-          type="text"
-          value={keyword}
-          onChange={(e) => handleKeywordChange(e.target.value)}
-          placeholder="搜索角色名、演员、描述..."
-          style={{
-            width: '100%',
-            padding: '10px 14px',
-            background: '#1a1a1a',
-            border: '1px solid #333',
-            borderRadius: 8,
-            color: '#e0e0e0',
-            fontSize: 14,
-            outline: 'none',
-            marginBottom: 20,
-            boxSizing: 'border-box',
-          }}
-        />
+        <div style={{
+          background: '#1a1a1a',
+          padding: 16,
+          borderRadius: 8,
+          border: '1px solid #333',
+          marginBottom: 20,
+        }}>
+          <input
+            type="text"
+            value={keyword}
+            onChange={(e) => handleKeywordChange(e.target.value)}
+            placeholder="搜索角色名、演员、描述..."
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              background: '#222',
+              border: '1px solid #444',
+              borderRadius: 6,
+              color: '#e0e0e0',
+              fontSize: 14,
+              outline: 'none',
+              marginBottom: 12,
+              boxSizing: 'border-box',
+            }}
+          />
+          {availableTags.length > 0 && (
+            <>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>
+                🏷️ 标签筛选 {selectedTagIds.length > 0 && <span style={{ color: '#3498db' }}>(已选 {selectedTagIds.length} 个)</span>}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {availableTags.map((tag) => {
+                  const selected = selectedTagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => {
+                        setSelectedTagIds((prev) =>
+                          selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]
+                        );
+                        const params = new URLSearchParams(searchParams);
+                        const newIds = selected
+                          ? selectedTagIds.filter((id) => id !== tag.id)
+                          : [...selectedTagIds, tag.id];
+                        if (newIds.length > 0) {
+                          params.set('tagIds', newIds.join(','));
+                        } else {
+                          params.delete('tagIds');
+                        }
+                        setSearchParams(params, { replace: true });
+                      }}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 14,
+                        border: `1px solid ${selected ? tag.color : '#444'}`,
+                        background: selected ? `${tag.color}20` : 'transparent',
+                        color: selected ? tag.color : '#aaa',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: tag.color,
+                      }} />
+                      {tag.name}
+                    </button>
+                  );
+                })}
+                {selectedTagIds.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSelectedTagIds([]);
+                      const params = new URLSearchParams(searchParams);
+                      params.delete('tagIds');
+                      setSearchParams(params, { replace: true });
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 14,
+                      border: '1px solid #555',
+                      background: 'transparent',
+                      color: '#888',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    清除筛选
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {sortMode && (
@@ -390,6 +516,32 @@ export default function RolesPage() {
               </div>
               {r.characterDescription && (
                 <p style={{ fontSize: 13, color: '#888', margin: '0 0 12px' }}>{r.characterDescription}</p>
+              )}
+
+              {r.tags && r.tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+                  {r.tags.map((tag: any) => (
+                    <span key={tag.id} style={{
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                      background: `${tag.color}15`,
+                      border: `1px solid ${tag.color}40`,
+                      color: tag.color,
+                      fontSize: 11,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}>
+                      <span style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: tag.color,
+                      }} />
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
               )}
 
               <div style={{ marginBottom: 12 }}>

@@ -110,6 +110,9 @@ export enum AuditAction {
   REJECT_APPROVAL = 'reject_approval',
   APPROVE_APPROVAL_STEP = 'approve_approval_step',
   REJECT_APPROVAL_STEP = 'reject_approval_step',
+  CREATE_SUBSCRIPTION = 'create_subscription',
+  UPDATE_SUBSCRIPTION = 'update_subscription',
+  DELETE_SUBSCRIPTION = 'delete_subscription',
 }
 
 export enum AuditModule {
@@ -133,6 +136,7 @@ export enum AuditModule {
   DRAMA = 'drama',
   ANNOTATION = 'annotation',
   APPROVAL = 'approval',
+  SUBSCRIPTION = 'subscription',
 }
 
 @Entity('audit_logs')
