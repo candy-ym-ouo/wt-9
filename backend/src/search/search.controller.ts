@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -18,9 +18,11 @@ export class SearchController {
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: string,
     @Query('groupByModule') groupByModule?: string,
+    @Query('dramaId') dramaId?: number,
+    @Request() req?: any,
   ) {
     if ((!query || query.trim().length === 0) && !modules && !dateFrom && !dateTo && !tags) {
-      return { rehearsals: [], roles: [], annotations: [], materials: [], performances: [], total: 0 };
+      return { rehearsals: [], roles: [], annotations: [], materials: [], performances: [], scripts: [], tasks: [], total: 0 };
     }
     return this.service.advancedSearch({
       query: query?.trim(),
@@ -32,11 +34,13 @@ export class SearchController {
       sortBy: sortBy as 'date' | 'name' | 'relevance' | undefined,
       sortOrder: sortOrder as 'asc' | 'desc' | undefined,
       groupByModule: groupByModule !== 'false',
+      dramaId,
+      userId: req.user.userId,
     });
   }
 
   @Get('meta/tags')
-  getTags() {
-    return this.service.getAllTags();
+  getTags(@Query('dramaId') dramaId?: number, @Request() req?: any) {
+    return this.service.getAllTags(dramaId, req.user.userId);
   }
 }

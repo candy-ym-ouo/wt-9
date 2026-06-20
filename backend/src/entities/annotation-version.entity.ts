@@ -16,6 +16,9 @@ export class AnnotationVersion {
   @Column()
   annotationId: number;
 
+  @Column({ nullable: true })
+  dramaId: number;
+
   @Column({ type: 'text', nullable: true })
   scriptContent: string;
 

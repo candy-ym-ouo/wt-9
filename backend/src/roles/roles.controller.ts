@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,18 +11,23 @@ export class RolesController {
   constructor(private service: RolesService) {}
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query('dramaId') dramaId: number, @Request() req: any) {
+    return this.service.findAll(dramaId, req.user.userId);
+  }
+
+  @Get('cross-drama')
+  findAllCrossDrama(@Request() req: any) {
+    return this.service.findAllCrossDrama(req.user.userId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: number) {
-    return this.service.findOne(id);
+  findOne(@Param('id') id: number, @Request() req: any) {
+    return this.service.findOne(id, req.user.userId);
   }
 
   @Get(':id/rehearsals')
-  getRoleRehearsals(@Param('id') id: number) {
-    return this.service.getRoleRehearsals(id);
+  getRoleRehearsals(@Param('id') id: number, @Request() req: any) {
+    return this.service.getRoleRehearsals(id, req.user.userId);
   }
 
   @Post()
@@ -37,6 +42,7 @@ export class RolesController {
       sceneNumbers?: number[];
       priority?: number;
       substituteActorIds?: number[];
+      dramaId: number;
     },
     @Request() req: any,
   ) {
@@ -47,6 +53,7 @@ export class RolesController {
         sceneNumbers: body.sceneNumbers || [],
         substituteActorIds: body.substituteActorIds || [],
       },
+      body.dramaId,
       req.user.userId,
       req.user.username,
     );

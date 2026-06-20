@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { CastRole, User, Rehearsal, AuditAction, AuditModule } from '../entities';
 import { LeavesService } from '../leaves/leaves.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { DramasService } from '../dramas/dramas.service';
 
 @Injectable()
 export class RolesService {
@@ -16,10 +17,21 @@ export class RolesService {
     private rehearsalRepo: Repository<Rehearsal>,
     private leavesService: LeavesService,
     private auditLogsService: AuditLogsService,
+    private dramasService: DramasService,
   ) {}
 
-  async create(data: Partial<CastRole>, operatorId: number, operatorName: string) {
-    const item = this.repo.create(data);
+  async create(
+    data: Partial<CastRole>,
+    dramaId: number,
+    operatorId: number,
+    operatorName: string,
+  ) {
+    await this.dramasService.checkAccess(dramaId, operatorId, ['owner', 'director', 'assistant_director']);
+
+    const item = this.repo.create({
+      ...data,
+      dramaId,
+    });
     const saved = await this.repo.save(item);
 
     await this.auditLogsService.log({
@@ -29,38 +41,65 @@ export class RolesService {
       operatorName,
       targetId: saved.id,
       targetType: 'role',
-      detail: `创建角色「${saved.characterName}」`,
-      metadata: { characterName: saved.characterName, actorId: saved.actorId },
+      detail: `在剧目 #${dramaId} 创建角色「${saved.characterName}」`,
+      metadata: { characterName: saved.characterName, actorId: saved.actorId, dramaId },
     });
 
-    return this.findOne(saved.id);
+    return this.findOne(saved.id, operatorId);
   }
 
-  async findAll() {
-    const roles = await this.repo.find({ order: { priority: 'ASC' } });
+  async findAll(dramaId: number | undefined, userId: number) {
+    if (dramaId) {
+      await this.dramasService.checkAccess(dramaId, userId, ['viewer']);
+      const roles = await this.repo.find({ where: { dramaId }, order: { priority: 'ASC' } });
+      return this.enrichWithUserInfo(roles);
+    } else {
+      const dramaIds = await this.dramasService.getUserDramaIds(userId);
+      if (dramaIds.length === 0) return [];
+      const roles = await this.repo.find({ where: { dramaId: In(dramaIds) }, order: { priority: 'ASC' } });
+      return this.enrichWithUserInfo(roles);
+    }
+  }
+
+  async findAllCrossDrama(userId: number) {
+    const dramaIds = await this.dramasService.getUserDramaIds(userId);
+    if (dramaIds.length === 0) return [];
+    const roles = await this.repo.find({ where: { dramaId: In(dramaIds) }, order: { priority: 'ASC' } });
     return this.enrichWithUserInfo(roles);
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, userId: number) {
     const role = await this.repo.findOne({ where: { id } });
     if (!role) return null;
+    if (role.dramaId) {
+      await this.dramasService.checkAccess(role.dramaId, userId, ['viewer']);
+    }
     const enriched = await this.enrichWithUserInfo([role]);
     return enriched[0];
   }
 
-  async findOneWithRehearsals(id: number) {
+  async findOneWithRehearsals(id: number, userId: number) {
     const role = await this.repo.findOne({ where: { id } });
     if (!role) return null;
+    if (role.dramaId) {
+      await this.dramasService.checkAccess(role.dramaId, userId, ['viewer']);
+    }
     const enriched = await this.enrichWithUserInfo([role]);
-    const rehearsals = await this.getRoleRehearsals(id);
+    const rehearsals = await this.getRoleRehearsals(id, userId);
     return { ...enriched[0], rehearsals };
   }
 
-  async getRoleRehearsals(roleId: number) {
+  async getRoleRehearsals(roleId: number, userId: number) {
     const role = await this.repo.findOne({ where: { id: roleId } });
     if (!role) return [];
+    if (role.dramaId) {
+      await this.dramasService.checkAccess(role.dramaId, userId, ['viewer']);
+    }
 
-    const allRehearsals = await this.rehearsalRepo.find({ order: { startTime: 'DESC' } });
+    const allRehearsals = await this.rehearsalRepo.find({
+      where: role.dramaId ? { dramaId: role.dramaId } : {},
+      order: { startTime: 'DESC' },
+    });
     const actorIds = new Set<number>();
     if (role.actorId) actorIds.add(role.actorId);
     (role.substituteActorIds || []).forEach((id) => actorIds.add(id));
@@ -83,10 +122,20 @@ export class RolesService {
     }));
   }
 
-  async update(id: number, data: Partial<CastRole>, operatorId: number, operatorName: string) {
+  async update(
+    id: number,
+    data: Partial<CastRole>,
+    operatorId: number,
+    operatorName: string,
+  ) {
     const oldRole = await this.repo.findOne({ where: { id } });
+    if (!oldRole) return null;
+    if (oldRole.dramaId) {
+      await this.dramasService.checkAccess(oldRole.dramaId, operatorId, ['owner', 'director', 'assistant_director']);
+    }
+
     await this.repo.update(id, data);
-    const updated = await this.findOne(id);
+    const updated = await this.findOne(id, operatorId);
 
     if (oldRole) {
       const changes: string[] = [];
@@ -113,7 +162,7 @@ export class RolesService {
         detail: changes.length > 0
           ? `更新角色「${oldRole.characterName}」: ${changes.join('; ')}`
           : `更新角色「${oldRole.characterName}」`,
-        metadata: { old: oldRole, new: data },
+        metadata: { old: oldRole, new: data, dramaId: oldRole.dramaId },
       });
     }
 
@@ -122,6 +171,11 @@ export class RolesService {
 
   async remove(id: number, operatorId: number, operatorName: string) {
     const role = await this.repo.findOne({ where: { id } });
+    if (!role) return null;
+    if (role.dramaId) {
+      await this.dramasService.checkAccess(role.dramaId, operatorId, ['owner', 'director']);
+    }
+
     if (role) {
       await this.auditLogsService.log({
         action: AuditAction.DELETE_ROLE,
@@ -131,15 +185,23 @@ export class RolesService {
         targetId: id,
         targetType: 'role',
         detail: `删除角色「${role.characterName}」`,
-        metadata: { characterName: role.characterName, actorId: role.actorId },
+        metadata: { characterName: role.characterName, actorId: role.actorId, dramaId: role.dramaId },
       });
     }
     return this.repo.delete(id);
   }
 
-  async addSubstitute(roleId: number, actorId: number, operatorId: number, operatorName: string) {
+  async addSubstitute(
+    roleId: number,
+    actorId: number,
+    operatorId: number,
+    operatorName: string,
+  ) {
     const role = await this.repo.findOne({ where: { id: roleId } });
     if (!role) return null;
+    if (role.dramaId) {
+      await this.dramasService.checkAccess(role.dramaId, operatorId, ['owner', 'director', 'assistant_director']);
+    }
 
     const actor = await this.userRepo.findOne({ where: { id: actorId } });
     const substitutes = role.substituteActorIds || [];
@@ -157,15 +219,23 @@ export class RolesService {
         targetUserId: actorId,
         targetUsername: actor?.username,
         detail: `为角色「${role.characterName}」添加替补演员 ${actor?.displayName || actor?.username || `#${actorId}`}`,
-        metadata: { roleId, actorId },
+        metadata: { roleId, actorId, dramaId: role.dramaId },
       });
     }
-    return this.findOne(roleId);
+    return this.findOne(roleId, operatorId);
   }
 
-  async removeSubstitute(roleId: number, actorId: number, operatorId: number, operatorName: string) {
+  async removeSubstitute(
+    roleId: number,
+    actorId: number,
+    operatorId: number,
+    operatorName: string,
+  ) {
     const role = await this.repo.findOne({ where: { id: roleId } });
     if (!role) return null;
+    if (role.dramaId) {
+      await this.dramasService.checkAccess(role.dramaId, operatorId, ['owner', 'director', 'assistant_director']);
+    }
 
     const actor = await this.userRepo.findOne({ where: { id: actorId } });
     const substitutes = (role.substituteActorIds || []).filter((id) => id !== actorId);
@@ -181,16 +251,26 @@ export class RolesService {
       targetUserId: actorId,
       targetUsername: actor?.username,
       detail: `为角色「${role.characterName}」移除替补演员 ${actor?.displayName || actor?.username || `#${actorId}`}`,
-      metadata: { roleId, actorId },
+      metadata: { roleId, actorId, dramaId: role.dramaId },
     });
 
-    return this.findOne(roleId);
+    return this.findOne(roleId, operatorId);
   }
 
-  async updatePriorities(updates: Array<{ id: number; priority: number }>, operatorId: number, operatorName: string) {
+  async updatePriorities(
+    updates: Array<{ id: number; priority: number }>,
+    operatorId: number,
+    operatorName: string,
+  ) {
     const oldRoles = await Promise.all(
       updates.map(({ id }) => this.repo.findOne({ where: { id } })),
     );
+
+    for (const role of oldRoles) {
+      if (role?.dramaId) {
+        await this.dramasService.checkAccess(role.dramaId, operatorId, ['owner', 'director', 'assistant_director']);
+      }
+    }
 
     await Promise.all(
       updates.map(({ id, priority }) =>
@@ -216,7 +296,11 @@ export class RolesService {
       metadata: { updates },
     });
 
-    return this.findAll();
+    return this.findAllCrossDrama(operatorId);
+  }
+
+  async getStatsByDrama(dramaId: number): Promise<number> {
+    return this.repo.count({ where: { dramaId } });
   }
 
   private async enrichWithUserInfo(roles: CastRole[]): Promise<any[]> {

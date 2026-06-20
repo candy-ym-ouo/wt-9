@@ -24,6 +24,9 @@ export class CastRole {
   priority: number;
 
   @Column({ nullable: true })
+  dramaId: number;
+
+  @Column({ nullable: true })
   createdBy: number;
 
   @CreateDateColumn()

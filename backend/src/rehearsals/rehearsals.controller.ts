@@ -12,20 +12,30 @@ export class RehearsalsController {
 
   @Get()
   async findAll(
+    @Query('dramaId') dramaId: number,
     @Query('start') start?: string,
     @Query('end') end?: string,
     @Query('location') location?: string,
     @Query('participantId') participantId?: string,
     @Query('timeSlot') timeSlot?: string,
     @Query('attendanceStatus') attendanceStatus?: string,
+    @Request() req?: any,
   ) {
     const hasFilters = location || participantId || timeSlot || attendanceStatus;
     let rehearsals: Rehearsal[];
     if (hasFilters || (start && end)) {
-      rehearsals = await this.service.findWithFilters({ start, end, location, participantId, timeSlot, attendanceStatus });
+      rehearsals = await this.service.findWithFilters({ start, end, location, participantId, timeSlot, attendanceStatus, dramaId }, req.user.userId);
     } else {
-      rehearsals = await this.service.findAll();
+      rehearsals = await this.service.findAll(dramaId, req.user.userId);
     }
+    const withConflicts = await this.service.enrichWithConflictInfo(rehearsals);
+    const withParticipants = await this.service.enrichWithParticipantInfo(rehearsals);
+    return withConflicts.map((r, i) => ({ ...r, ...withParticipants[i] }));
+  }
+
+  @Get('cross-drama')
+  async findAllCrossDrama(@Request() req: any) {
+    const rehearsals = await this.service.findAllCrossDrama(req.user.userId);
     const withConflicts = await this.service.enrichWithConflictInfo(rehearsals);
     const withParticipants = await this.service.enrichWithParticipantInfo(rehearsals);
     return withConflicts.map((r, i) => ({ ...r, ...withParticipants[i] }));
@@ -35,17 +45,22 @@ export class RehearsalsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   getStatistics(
+    @Query('dramaId') dramaId: number,
     @Query('start') start?: string,
     @Query('end') end?: string,
+    @Request() req?: any,
   ) {
-    return this.service.getStatistics(start, end);
+    return this.service.getStatistics(start, end, dramaId, req.user.userId);
   }
 
   @Get('last-week/schedule')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
-  async getLastWeekSchedule() {
-    const rehearsals = await this.service.getLastWeekRehearsals();
+  async getLastWeekSchedule(
+    @Query('dramaId') dramaId: number,
+    @Request() req: any,
+  ) {
+    const rehearsals = await this.service.getLastWeekRehearsals(dramaId, req.user.userId);
     const withConflicts = await this.service.enrichWithConflictInfo(rehearsals);
     const withParticipants = await this.service.enrichWithParticipantInfo(rehearsals);
     return withConflicts.map((r, i) => ({ ...r, ...withParticipants[i] }));
@@ -69,10 +84,11 @@ export class RehearsalsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
   async copyLastWeekAll(
+    @Query('dramaId') dramaId: number,
     @Request() req: any,
   ) {
     try {
-      return await this.service.copyLastWeekAll(req.user.userId, req.user.username);
+      return await this.service.copyLastWeekAll(dramaId, req.user.userId, req.user.username);
     } catch (e: any) {
       throw new HttpException(e.message, HttpStatus.BAD_REQUEST);
     }
@@ -89,6 +105,7 @@ export class RehearsalsController {
       participantIds?: number[];
       excludeId?: number;
       location?: string;
+      dramaId?: number;
     },
   ) {
     return this.service.checkConflicts(
@@ -97,6 +114,7 @@ export class RehearsalsController {
       body.participantIds || [],
       body.excludeId,
       body.location,
+      body.dramaId,
     );
   }
 
@@ -113,6 +131,7 @@ export class RehearsalsController {
       location?: string;
       participantIds?: number[];
       materialIds?: number[];
+      dramaId: number;
     },
     @Request() req: any,
   ) {
@@ -126,6 +145,7 @@ export class RehearsalsController {
           participantIds: body.participantIds || [],
           materialIds: body.materialIds || [],
         },
+        body.dramaId,
         req.user.userId,
         req.user.username,
       );
@@ -135,13 +155,13 @@ export class RehearsalsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: number) {
-    return this.service.findOneWithDetails(id);
+  findOne(@Param('id') id: number, @Request() req: any) {
+    return this.service.findOneWithDetails(id, req.user.userId);
   }
 
   @Get(':id/roles')
-  getRoleAssignments(@Param('id') id: number) {
-    return this.service.getRoleAssignments(id);
+  getRoleAssignments(@Param('id') id: number, @Request() req: any) {
+    return this.service.getRoleAssignments(id, req.user.userId);
   }
 
   @Put(':id')

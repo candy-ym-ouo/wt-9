@@ -95,6 +95,15 @@ export enum AuditAction {
   ARCHIVE_ANNOUNCEMENT = 'archive_announcement',
   PIN_ANNOUNCEMENT = 'pin_announcement',
   UNPIN_ANNOUNCEMENT = 'unpin_announcement',
+  CREATE_DRAMA = 'create_drama',
+  UPDATE_DRAMA = 'update_drama',
+  DELETE_DRAMA = 'delete_drama',
+  GRANT_DRAMA_PERMISSION = 'grant_drama_permission',
+  REVOKE_DRAMA_PERMISSION = 'revoke_drama_permission',
+  UPDATE_DRAMA_PERMISSION = 'update_drama_permission',
+  CREATE_ANNOTATION = 'create_annotation',
+  UPDATE_ANNOTATION = 'update_annotation',
+  DELETE_ANNOTATION = 'delete_annotation',
 }
 
 export enum AuditModule {
@@ -115,6 +124,8 @@ export enum AuditModule {
   ROOM_RESERVATION = 'room_reservation',
   LEAVE = 'leave',
   ANNOUNCEMENT = 'announcement',
+  DRAMA = 'drama',
+  ANNOTATION = 'annotation',
 }
 
 @Entity('audit_logs')

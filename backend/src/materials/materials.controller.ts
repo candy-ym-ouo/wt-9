@@ -37,55 +37,77 @@ export class MaterialsController {
 
   @Get()
   async findAll(
+    @Query('dramaId') dramaId: number,
     @Query('category') category?: string,
     @Query('categories') categories?: string,
     @Query('tags') tags?: string,
     @Query('keyword') keyword?: string,
+    @Request() req?: any,
   ) {
     let materials: Material[];
     if (category && !categories) {
-      materials = await this.service.findByCategory(category);
+      materials = await this.service.findByCategory(category, dramaId, req.user.userId);
     } else {
-      materials = await this.service.findAll({ categories, tags, keyword });
+      materials = await this.service.findAll(dramaId, req.user.userId, { categories, tags, keyword });
     }
     return this.service.enrichWithReferenceCounts(materials);
   }
 
+  @Get('cross-drama')
+  async findAllCrossDrama(
+    @Query('categories') categories?: string,
+    @Query('tags') tags?: string,
+    @Query('keyword') keyword?: string,
+    @Request() req?: any,
+  ) {
+    const materials = await this.service.findAllCrossDrama(req.user.userId, { categories, tags, keyword });
+    return this.service.enrichWithReferenceCounts(materials);
+  }
+
   @Get('meta/categories')
-  getCategories() {
-    return this.service.getAllCategories();
+  getCategories(
+    @Query('dramaId') dramaId: number,
+    @Request() req: any,
+  ) {
+    return this.service.getAllCategories(dramaId, req.user.userId);
   }
 
   @Get('meta/tags')
-  getTags() {
-    return this.service.getAllTags();
+  getTags(
+    @Query('dramaId') dramaId: number,
+    @Request() req: any,
+  ) {
+    return this.service.getAllTags(dramaId, req.user.userId);
   }
 
   @Get('check-duplicate')
-  checkDuplicate(@Query('filename') filename: string) {
+  checkDuplicate(
+    @Query('filename') filename: string,
+    @Query('dramaId') dramaId: number,
+  ) {
     if (!filename) {
       return { exists: false, materials: [] };
     }
-    return this.service.checkDuplicate(filename);
+    return this.service.checkDuplicate(filename, dramaId);
   }
 
   @Get(':id/references')
-  getReferences(@Param('id') id: number) {
+  getReferences(@Param('id') id: number, @Request() req: any) {
     return this.service.getReferences(id);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: number) {
-    return this.service.findOneWithReferences(id);
+  findOne(@Param('id') id: number, @Request() req: any) {
+    return this.service.findOneWithReferences(id, req.user.userId);
   }
 
   @Get(':id/download')
   async download(@Param('id') id: number, @Request() req: any, @Res() res: Response) {
-    const material = await this.service.findOne(id);
+    const material = await this.service.findOne(id, req.user.userId);
     if (!material) {
       return res.status(404).json({ message: '文件不存在' });
     }
-    const canDl = await this.service.canDownload(id, req.user.role);
+    const canDl = await this.service.canDownload(id, req.user.role, req.user.userId);
     if (!canDl) {
       return res.status(403).json({ message: '无下载权限' });
     }
@@ -116,6 +138,7 @@ export class MaterialsController {
   async uploadFile(
     @UploadedFile() file: Express.Multer.File,
     @Request() req: any,
+    @Query('dramaId') dramaIdStr: string,
     @Query('category') category?: string,
     @Query('description') description?: string,
     @Query('categories') categoriesStr?: string,
@@ -124,6 +147,7 @@ export class MaterialsController {
     @Query('onDuplicate') onDuplicate?: 'new_version' | 'overwrite',
     @Query('overwriteTargetId') overwriteTargetIdStr?: string,
   ) {
+    const dramaId = parseInt(dramaIdStr, 10);
     const parsedCategories = categoriesStr ? categoriesStr.split(',').map((c) => c.trim()).filter(Boolean) : [];
     const parsedTags = tagsStr ? tagsStr.split(',').map((t) => t.trim()).filter(Boolean) : [];
     const parsedDownloadRoles = downloadRolesStr ? downloadRolesStr.split(',').map((r) => r.trim()).filter(Boolean) : [];
@@ -142,6 +166,7 @@ export class MaterialsController {
         description: description || '',
         createdBy: req.user.userId,
       },
+      dramaId,
       req.user.userId,
       req.user.username,
       onDuplicate,

@@ -27,6 +27,9 @@ export class Annotation {
   materialIds: number[];
 
   @Column({ nullable: true })
+  dramaId: number;
+
+  @Column({ nullable: true })
   createdBy: number;
 
   @Column({ nullable: true })

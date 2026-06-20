@@ -5,6 +5,7 @@ import { Rehearsal, User, CastRole, LeaveRequest, LeaveStatus, Material, AuditAc
 import { LeavesService } from '../leaves/leaves.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { DramasService } from '../dramas/dramas.service';
 
 export interface ConflictInfo {
   hasConflict: boolean;
@@ -72,6 +73,7 @@ export class RehearsalsService {
     private leavesService: LeavesService,
     private auditLogsService: AuditLogsService,
     private notificationsService: NotificationsService,
+    private dramasService: DramasService,
   ) {}
 
   async checkConflicts(
@@ -80,12 +82,14 @@ export class RehearsalsService {
     participantIds: number[] = [],
     excludeId?: number,
     location?: string,
+    dramaId?: number,
   ): Promise<ConflictInfo> {
     if (startTime >= endTime) {
       throw new BadRequestException('结束时间必须晚于开始时间');
     }
 
-    const allRehearsals = await this.repo.find();
+    const where: any = dramaId ? { dramaId } : {};
+    const allRehearsals = await this.repo.find({ where });
     const otherRehearsals = excludeId
       ? allRehearsals.filter((r) => r.id !== excludeId)
       : allRehearsals;
@@ -153,7 +157,14 @@ export class RehearsalsService {
     return start1 < end2 && end1 > start2;
   }
 
-  async create(data: Partial<Rehearsal>, operatorId?: number, operatorName?: string) {
+  async create(
+    data: Partial<Rehearsal>,
+    dramaId: number,
+    operatorId?: number,
+    operatorName?: string,
+  ) {
+    await this.dramasService.checkAccess(dramaId, operatorId!, ['owner', 'director', 'assistant_director']);
+
     const startTime = data.startTime instanceof Date ? data.startTime : new Date(data.startTime!);
     const endTime = data.endTime instanceof Date ? data.endTime : new Date(data.endTime!);
 
@@ -179,6 +190,7 @@ export class RehearsalsService {
         [],
         undefined,
         data.location,
+        dramaId,
       );
       if (conflict.locationConflicts.length > 0) {
         const titles = conflict.locationConflicts.map((r) => r.title).join('、');
@@ -186,7 +198,7 @@ export class RehearsalsService {
       }
     }
 
-    const item = this.repo.create({ ...data, materialIds });
+    const item = this.repo.create({ ...data, materialIds, dramaId });
     const saved = await this.repo.save(item);
 
     if (operatorId !== undefined) {
@@ -198,7 +210,7 @@ export class RehearsalsService {
         operatorName,
         targetId: saved.id,
         targetType: 'rehearsal',
-        detail: `创建排练「${saved.title}」(${data.location || '无地点'}, ${timeStr})`,
+        detail: `在剧目 #${dramaId} 创建排练「${saved.title}」(${data.location || '无地点'}, ${timeStr})`,
         metadata: {
           title: saved.title,
           location: saved.location,
@@ -206,6 +218,7 @@ export class RehearsalsService {
           endTime: saved.endTime,
           participantIds: saved.participantIds,
           materialIds: saved.materialIds,
+          dramaId,
         },
       });
 
@@ -220,14 +233,27 @@ export class RehearsalsService {
     return saved;
   }
 
-  async findAll() {
-    return this.repo.find({ order: { startTime: 'ASC' } });
+  async findAll(dramaId: number | undefined, userId: number) {
+    if (dramaId) {
+      await this.dramasService.checkAccess(dramaId, userId, ['viewer']);
+      return this.repo.find({ where: { dramaId }, order: { startTime: 'ASC' } });
+    } else {
+      const dramaIds = await this.dramasService.getUserDramaIds(userId);
+      if (dramaIds.length === 0) return [];
+      return this.repo.find({ where: { dramaId: In(dramaIds) }, order: { startTime: 'ASC' } });
+    }
   }
 
-  async findByDateRange(start: string, end: string) {
+  async findAllCrossDrama(userId: number) {
+    const dramaIds = await this.dramasService.getUserDramaIds(userId);
+    if (dramaIds.length === 0) return [];
+    return this.repo.find({ where: { dramaId: In(dramaIds) }, order: { startTime: 'ASC' } });
+  }
+
+  async findByDateRange(start: string, end: string, dramaId: number | undefined, userId: number) {
     const startDate = new Date(start);
     const endDate = new Date(end);
-    const all = await this.repo.find({ order: { startTime: 'ASC' } });
+    const all = await this.findAll(dramaId, userId);
     return all.filter(
       (r) => this.isTimeOverlap(startDate, endDate, r.startTime, r.endTime),
     );
@@ -240,8 +266,9 @@ export class RehearsalsService {
     participantId?: string;
     timeSlot?: string;
     attendanceStatus?: string;
-  }) {
-    let result = await this.repo.find({ order: { startTime: 'ASC' } });
+    dramaId?: number;
+  }, userId: number) {
+    let result = await this.findAll(filters.dramaId, userId);
 
     if (filters.start && filters.end) {
       const startDate = new Date(filters.start);
@@ -314,14 +341,27 @@ export class RehearsalsService {
     return result;
   }
 
-  async findOne(id: number) {
-    return this.repo.findOne({ where: { id } });
+  async findOne(id: number, userId: number) {
+    const rehearsal = await this.repo.findOne({ where: { id } });
+    if (!rehearsal) return null;
+    if (rehearsal.dramaId) {
+      await this.dramasService.checkAccess(rehearsal.dramaId, userId, ['viewer']);
+    }
+    return rehearsal;
   }
 
-  async update(id: number, data: Partial<Rehearsal>, operatorId?: number, operatorName?: string) {
+  async update(
+    id: number,
+    data: Partial<Rehearsal>,
+    operatorId?: number,
+    operatorName?: string,
+  ) {
     const existing = await this.repo.findOne({ where: { id } });
     if (!existing) {
       throw new BadRequestException('排练不存在');
+    }
+    if (existing.dramaId) {
+      await this.dramasService.checkAccess(existing.dramaId, operatorId!, ['owner', 'director', 'assistant_director']);
     }
 
     const startTime = data.startTime
@@ -363,6 +403,7 @@ export class RehearsalsService {
         [],
         id,
         location,
+        existing.dramaId,
       );
       if (conflict.locationConflicts.length > 0) {
         const titles = conflict.locationConflicts.map((r) => r.title).join('、');
@@ -406,7 +447,7 @@ export class RehearsalsService {
         detail: changes.length > 0
           ? `更新排练「${existing.title}」: ${changes.join('; ')}`
           : `更新排练「${existing.title}」`,
-        metadata: { old: existing, new: data },
+        metadata: { old: existing, new: data, dramaId: existing.dramaId },
       });
 
       this.notificationsService.notifyRehearsalChange(
@@ -422,6 +463,11 @@ export class RehearsalsService {
 
   async remove(id: number, operatorId?: number, operatorName?: string) {
     const rehearsal = await this.repo.findOne({ where: { id } });
+    if (!rehearsal) return null;
+    if (rehearsal.dramaId) {
+      await this.dramasService.checkAccess(rehearsal.dramaId, operatorId!, ['owner', 'director']);
+    }
+
     if (rehearsal && operatorId !== undefined) {
       await this.auditLogsService.log({
         action: AuditAction.DELETE_REHEARSAL,
@@ -436,6 +482,7 @@ export class RehearsalsService {
           location: rehearsal.location,
           startTime: rehearsal.startTime,
           endTime: rehearsal.endTime,
+          dramaId: rehearsal.dramaId,
         },
       });
 
@@ -458,6 +505,7 @@ export class RehearsalsService {
         r.participantIds || [],
         r.id,
         r.location,
+        r.dramaId,
       );
       result.push({
         ...r,
@@ -484,7 +532,8 @@ export class RehearsalsService {
       rehearsal.endTime,
     );
 
-    const roles = await this.roleRepo.find();
+    const where: any = rehearsal.dramaId ? { dramaId: rehearsal.dramaId } : {};
+    const roles = await this.roleRepo.find({ where, order: { priority: 'ASC' } });
     const roleByActor = new Map<number, CastRole>();
     roles.forEach((role) => {
       if (role.actorId) {
@@ -567,23 +616,24 @@ export class RehearsalsService {
     return result;
   }
 
-  async findOneWithDetails(id: number) {
-    const rehearsal = await this.repo.findOne({ where: { id } });
+  async findOneWithDetails(id: number, userId: number) {
+    const rehearsal = await this.findOne(id, userId);
     if (!rehearsal) {
       return null;
     }
     const enriched = await this.enrichWithParticipantInfo([rehearsal]);
     const withConflict = await this.enrichWithConflictInfo([rehearsal]);
-    const roleAssignments = await this.getRoleAssignments(id);
+    const roleAssignments = await this.getRoleAssignments(id, userId);
     return { ...enriched[0], ...withConflict[0], roleAssignments };
   }
 
-  async getRoleAssignments(rehearsalId: number) {
-    const rehearsal = await this.repo.findOne({ where: { id: rehearsalId } });
+  async getRoleAssignments(rehearsalId: number, userId: number) {
+    const rehearsal = await this.findOne(rehearsalId, userId);
     if (!rehearsal) return [];
 
     const participantIds = rehearsal.participantIds || [];
-    const allRoles = await this.roleRepo.find({ order: { priority: 'ASC' } });
+    const where: any = rehearsal.dramaId ? { dramaId: rehearsal.dramaId } : {};
+    const allRoles = await this.roleRepo.find({ where, order: { priority: 'ASC' } });
     const users = await this.userRepo.findByIds(participantIds);
     const userMap = new Map(users.map((u) => [u.id, u]));
 
@@ -655,10 +705,18 @@ export class RehearsalsService {
     return roleAssignments;
   }
 
-  async updateAttendance(id: number, updates: AttendanceUpdate[], operatorId?: number, operatorName?: string) {
+  async updateAttendance(
+    id: number,
+    updates: AttendanceUpdate[],
+    operatorId?: number,
+    operatorName?: string,
+  ) {
     const existing = await this.repo.findOne({ where: { id } });
     if (!existing) {
       throw new BadRequestException('排练不存在');
+    }
+    if (existing.dramaId) {
+      await this.dramasService.checkAccess(existing.dramaId, operatorId!, ['owner', 'director', 'assistant_director']);
     }
 
     const currentAttendance = existing.attendance || {};
@@ -708,11 +766,11 @@ export class RehearsalsService {
         targetId: id,
         targetType: 'rehearsal',
         detail: `更新排练「${existing.title}」考勤: ${changeDetails.join('; ')}`,
-        metadata: { updates },
+        metadata: { updates, dramaId: existing.dramaId },
       });
     }
 
-    return this.findOneWithDetails(id);
+    return this.findOneWithDetails(id, operatorId!);
   }
 
   getLastWeekRange(): { start: Date; end: Date } {
@@ -731,9 +789,9 @@ export class RehearsalsService {
     return { start: lastMonday, end: lastSunday };
   }
 
-  async getLastWeekRehearsals(): Promise<Rehearsal[]> {
+  async getLastWeekRehearsals(dramaId: number | undefined, userId: number): Promise<Rehearsal[]> {
     const { start, end } = this.getLastWeekRange();
-    const all = await this.repo.find({ order: { startTime: 'ASC' } });
+    const all = await this.findAll(dramaId, userId);
     return all.filter((r) =>
       this.isTimeOverlap(start, end, r.startTime, r.endTime),
     );
@@ -748,6 +806,9 @@ export class RehearsalsService {
     if (!source) {
       throw new BadRequestException('源排练不存在');
     }
+    if (source.dramaId) {
+      await this.dramasService.checkAccess(source.dramaId, operatorId!, ['owner', 'director', 'assistant_director']);
+    }
 
     const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
     const newStartTime = new Date(source.startTime.getTime() + ONE_WEEK_MS);
@@ -760,6 +821,7 @@ export class RehearsalsService {
         [],
         undefined,
         source.location,
+        source.dramaId,
       );
       if (conflict.locationConflicts.length > 0) {
         const titles = conflict.locationConflicts.map((r) => r.title).join('、');
@@ -775,6 +837,7 @@ export class RehearsalsService {
       location: source.location,
       participantIds: source.participantIds || [],
       materialIds: source.materialIds || [],
+      dramaId: source.dramaId,
       createdBy: operatorId,
     });
 
@@ -798,6 +861,7 @@ export class RehearsalsService {
           endTime: saved.endTime,
           participantIds: saved.participantIds,
           materialIds: saved.materialIds,
+          dramaId: source.dramaId,
         },
       });
     }
@@ -806,10 +870,11 @@ export class RehearsalsService {
   }
 
   async copyLastWeekAll(
+    dramaId: number | undefined,
     operatorId?: number,
     operatorName?: string,
   ): Promise<{ created: Rehearsal[]; skipped: Array<{ rehearsal: Rehearsal; reason: string }> }> {
-    const lastWeekRehearsals = await this.getLastWeekRehearsals();
+    const lastWeekRehearsals = await this.getLastWeekRehearsals(dramaId, operatorId!);
     const created: Rehearsal[] = [];
     const skipped: Array<{ rehearsal: Rehearsal; reason: string }> = [];
 
@@ -825,8 +890,15 @@ export class RehearsalsService {
     return { created, skipped };
   }
 
-  async getStatistics(start?: string, end?: string): Promise<RehearsalStatistics> {
-    let rehearsals = await this.repo.find({ order: { startTime: 'ASC' } });
+  async getStatistics(
+    start?: string,
+    end?: string,
+    dramaId?: number,
+    userId?: number,
+  ): Promise<RehearsalStatistics> {
+    let rehearsals = dramaId !== undefined && userId !== undefined
+      ? await this.findAll(dramaId, userId)
+      : await this.findAllCrossDrama(userId!);
 
     if (start && end) {
       const startDate = new Date(start);
@@ -914,5 +986,9 @@ export class RehearsalsService {
       attendanceRate,
       byUser,
     };
+  }
+
+  async getStatsByDrama(dramaId: number): Promise<number> {
+    return this.repo.count({ where: { dramaId } });
   }
 }

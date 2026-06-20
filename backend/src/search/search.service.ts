@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { Repository, Like, Between, MoreThanOrEqual, LessThanOrEqual, In } from 'typeorm';
 import { Rehearsal, CastRole, Annotation, Material, Performance, Script, ScriptChapter, ScriptScene, Task } from '../entities';
 import { RehearsalsService } from '../rehearsals/rehearsals.service';
 import { RolesService } from '../roles/roles.service';
@@ -9,6 +9,7 @@ import { MaterialsService } from '../materials/materials.service';
 import { PerformancesService } from '../performances/performances.service';
 import { ScriptsService } from '../scripts/scripts.service';
 import { TasksService } from '../tasks/tasks.service';
+import { DramasService } from '../dramas/dramas.service';
 
 interface AdvancedSearchParams {
   query?: string;
@@ -20,6 +21,8 @@ interface AdvancedSearchParams {
   sortBy?: 'date' | 'name' | 'relevance';
   sortOrder?: 'asc' | 'desc';
   groupByModule?: boolean;
+  dramaId?: number;
+  userId: number;
 }
 
 export interface SearchResultItem {
@@ -72,6 +75,7 @@ export class SearchService {
     private performancesService: PerformancesService,
     private scriptsService: ScriptsService,
     private tasksService: TasksService,
+    private dramasService: DramasService,
   ) {}
 
   private resolveDateColumn(entityType: string, dateField: string): string {
@@ -86,6 +90,14 @@ export class SearchService {
     return value ? new Date(value) : new Date(raw.createdAt);
   }
 
+  private async getAccessibleDramaIds(dramaId: number | undefined, userId: number): Promise<number[]> {
+    if (dramaId) {
+      await this.dramasService.checkAccess(dramaId, userId, ['viewer']);
+      return [dramaId];
+    }
+    return this.dramasService.getUserDramaIds(userId);
+  }
+
   async advancedSearch(params: AdvancedSearchParams) {
     const {
       query,
@@ -97,7 +109,23 @@ export class SearchService {
       sortBy = 'relevance',
       sortOrder = 'desc',
       groupByModule = true,
+      dramaId,
+      userId,
     } = params;
+
+    const accessibleDramaIds = await this.getAccessibleDramaIds(dramaId, userId);
+    if (accessibleDramaIds.length === 0) {
+      return {
+        rehearsals: [],
+        roles: [],
+        annotations: [],
+        materials: [],
+        performances: [],
+        scripts: [],
+        tasks: [],
+        total: 0,
+      };
+    }
 
     const likeQuery = query ? `%${query}%` : null;
 
@@ -106,43 +134,43 @@ export class SearchService {
     const searches: Promise<any[]>[] = [];
 
     if (modules.includes('rehearsals')) {
-      searches.push(this.searchRehearsals(likeQuery, dateRange, dateField, tags));
+      searches.push(this.searchRehearsals(likeQuery, dateRange, dateField, tags, accessibleDramaIds));
     } else {
       searches.push(Promise.resolve([]));
     }
 
     if (modules.includes('roles')) {
-      searches.push(this.searchRoles(likeQuery, dateRange, dateField, tags));
+      searches.push(this.searchRoles(likeQuery, dateRange, dateField, tags, accessibleDramaIds));
     } else {
       searches.push(Promise.resolve([]));
     }
 
     if (modules.includes('annotations')) {
-      searches.push(this.searchAnnotations(likeQuery, dateRange, dateField, tags));
+      searches.push(this.searchAnnotations(likeQuery, dateRange, dateField, tags, accessibleDramaIds));
     } else {
       searches.push(Promise.resolve([]));
     }
 
     if (modules.includes('materials')) {
-      searches.push(this.searchMaterials(likeQuery, dateRange, dateField, tags));
+      searches.push(this.searchMaterials(likeQuery, dateRange, dateField, tags, accessibleDramaIds));
     } else {
       searches.push(Promise.resolve([]));
     }
 
     if (modules.includes('performances')) {
-      searches.push(this.searchPerformances(likeQuery, dateRange, dateField, tags));
+      searches.push(this.searchPerformances(likeQuery, dateRange, dateField, tags, accessibleDramaIds));
     } else {
       searches.push(Promise.resolve([]));
     }
 
     if (modules.includes('scripts')) {
-      searches.push(this.searchScripts(likeQuery, dateRange, dateField, tags));
+      searches.push(this.searchScripts(likeQuery, dateRange, dateField, tags, accessibleDramaIds));
     } else {
       searches.push(Promise.resolve([]));
     }
 
     if (modules.includes('tasks')) {
-      searches.push(this.searchTasks(likeQuery, dateRange, dateField, tags));
+      searches.push(this.searchTasks(likeQuery, dateRange, dateField, tags, accessibleDramaIds));
     } else {
       searches.push(Promise.resolve([]));
     }
@@ -159,7 +187,7 @@ export class SearchService {
     const roleIds = roles.map((r) => r.id);
     const enrichedRoles: any[] = [];
     for (const roleId of roleIds) {
-      const roleDetail = await this.rolesService.findOne(roleId);
+      const roleDetail = await this.rolesService.findOne(roleId, userId);
       if (roleDetail) {
         enrichedRoles.push(roleDetail);
       }
@@ -237,29 +265,29 @@ export class SearchService {
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
     _tags?: string[],
+    dramaIds?: number[],
   ) {
     const whereConditions: any[] = [];
 
+    const baseConditions: any = {};
+    if (dramaIds && dramaIds.length > 0) {
+      baseConditions.dramaId = In(dramaIds);
+    }
+
     if (likeQuery) {
       whereConditions.push(
-        { title: Like(likeQuery) },
-        { description: Like(likeQuery) },
-        { location: Like(likeQuery) },
+        { ...baseConditions, title: Like(likeQuery) },
+        { ...baseConditions, description: Like(likeQuery) },
+        { ...baseConditions, location: Like(likeQuery) },
       );
+    } else {
+      whereConditions.push(baseConditions);
     }
 
     const dateFieldName = this.resolveDateColumn('rehearsal', dateField);
 
     if (dateRange) {
-      if (whereConditions.length === 0) {
-        whereConditions.push(this.applyDateFilter({}, dateRange, dateFieldName));
-      } else {
-        whereConditions.forEach((w) => this.applyDateFilter(w, dateRange, dateFieldName));
-      }
-    }
-
-    if (whereConditions.length === 0) {
-      return this.rehearsalRepo.find();
+      whereConditions.forEach((w) => this.applyDateFilter(w, dateRange, dateFieldName));
     }
 
     return this.rehearsalRepo.find({ where: whereConditions });
@@ -270,28 +298,28 @@ export class SearchService {
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
     _tags?: string[],
+    dramaIds?: number[],
   ) {
     const whereConditions: any[] = [];
 
+    const baseConditions: any = {};
+    if (dramaIds && dramaIds.length > 0) {
+      baseConditions.dramaId = In(dramaIds);
+    }
+
     if (likeQuery) {
       whereConditions.push(
-        { characterName: Like(likeQuery) },
-        { characterDescription: Like(likeQuery) },
+        { ...baseConditions, characterName: Like(likeQuery) },
+        { ...baseConditions, characterDescription: Like(likeQuery) },
       );
+    } else {
+      whereConditions.push(baseConditions);
     }
 
     const dateFieldName = this.resolveDateColumn('role', dateField);
 
     if (dateRange) {
-      if (whereConditions.length === 0) {
-        whereConditions.push(this.applyDateFilter({}, dateRange, dateFieldName));
-      } else {
-        whereConditions.forEach((w) => this.applyDateFilter(w, dateRange, dateFieldName));
-      }
-    }
-
-    if (whereConditions.length === 0) {
-      return this.roleRepo.find();
+      whereConditions.forEach((w) => this.applyDateFilter(w, dateRange, dateFieldName));
     }
 
     return this.roleRepo.find({ where: whereConditions });
@@ -302,45 +330,41 @@ export class SearchService {
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
     tags?: string[],
+    dramaIds?: number[],
   ) {
     const whereConditions: any[] = [];
 
+    const baseConditions: any = {};
+    if (dramaIds && dramaIds.length > 0) {
+      baseConditions.dramaId = In(dramaIds);
+    }
+
     if (likeQuery) {
       whereConditions.push(
-        { scriptContent: Like(likeQuery) },
-        { note: Like(likeQuery) },
-        { tag: Like(likeQuery) },
+        { ...baseConditions, scriptContent: Like(likeQuery) },
+        { ...baseConditions, note: Like(likeQuery) },
+        { ...baseConditions, tag: Like(likeQuery) },
       );
+    } else {
+      whereConditions.push(baseConditions);
     }
 
     if (tags && tags.length > 0) {
       const tagConditions = tags.map((tag) => ({ tag: Like(`%${tag}%`) }));
-      if (whereConditions.length === 0) {
-        whereConditions.push(...tagConditions);
-      } else {
-        const combined: any[] = [];
-        for (const wc of whereConditions) {
-          for (const tc of tagConditions) {
-            combined.push({ ...wc, ...tc });
-          }
+      const combined: any[] = [];
+      for (const wc of whereConditions) {
+        for (const tc of tagConditions) {
+          combined.push({ ...wc, ...tc });
         }
-        whereConditions.length = 0;
-        whereConditions.push(...combined);
       }
+      whereConditions.length = 0;
+      whereConditions.push(...combined);
     }
 
     const dateFieldName = this.resolveDateColumn('annotation', dateField);
 
     if (dateRange) {
-      if (whereConditions.length === 0) {
-        whereConditions.push(this.applyDateFilter({}, dateRange, dateFieldName));
-      } else {
-        whereConditions.forEach((w) => this.applyDateFilter(w, dateRange, dateFieldName));
-      }
-    }
-
-    if (whereConditions.length === 0) {
-      return this.annotationRepo.find();
+      whereConditions.forEach((w) => this.applyDateFilter(w, dateRange, dateFieldName));
     }
 
     return this.annotationRepo.find({ where: whereConditions });
@@ -351,11 +375,17 @@ export class SearchService {
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
     tags?: string[],
+    dramaIds?: number[],
   ) {
     const qb = this.materialRepo.createQueryBuilder('m');
 
     const conditions: string[] = [];
     const params: any = {};
+
+    if (dramaIds && dramaIds.length > 0) {
+      conditions.push('m.dramaId IN (:...dramaIds)');
+      params.dramaIds = dramaIds;
+    }
 
     if (likeQuery) {
       conditions.push('(m.originalName LIKE :q OR m.description LIKE :q OR m.category LIKE :q OR m.categories LIKE :q OR m.tags LIKE :q)');
@@ -394,11 +424,17 @@ export class SearchService {
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
     tags?: string[],
+    dramaIds?: number[],
   ) {
     const qb = this.performanceRepo.createQueryBuilder('p');
 
     const conditions: string[] = [];
     const params: any = {};
+
+    if (dramaIds && dramaIds.length > 0) {
+      conditions.push('p.dramaId IN (:...dramaIds)');
+      params.dramaIds = dramaIds;
+    }
 
     if (likeQuery) {
       conditions.push('(p.title LIKE :q OR p.description LIKE :q OR p.venue LIKE :q OR p.theater LIKE :q OR p.notes LIKE :q)');
@@ -437,11 +473,17 @@ export class SearchService {
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
     tags?: string[],
+    dramaIds?: number[],
   ) {
     const qb = this.scriptRepo.createQueryBuilder('s');
 
     const conditions: string[] = [];
     const params: any = {};
+
+    if (dramaIds && dramaIds.length > 0) {
+      conditions.push('s.dramaId IN (:...dramaIds)');
+      params.dramaIds = dramaIds;
+    }
 
     if (likeQuery) {
       conditions.push('(s.title LIKE :q OR s.author LIKE :q OR s.description LIKE :q OR s.rawContent LIKE :q)');
@@ -480,11 +522,17 @@ export class SearchService {
     dateRange: { from?: Date; to?: Date } | null,
     dateField: string,
     tags?: string[],
+    dramaIds?: number[],
   ) {
     const qb = this.taskRepo.createQueryBuilder('t');
 
     const conditions: string[] = [];
     const params: any = {};
+
+    if (dramaIds && dramaIds.length > 0) {
+      conditions.push('t.dramaId IN (:...dramaIds)');
+      params.dramaIds = dramaIds;
+    }
 
     if (likeQuery) {
       conditions.push('(t.title LIKE :q OR t.description LIKE :q OR t.category LIKE :q OR t.tags LIKE :q)');
@@ -653,13 +701,20 @@ export class SearchService {
     return score;
   }
 
-  async getAllTags() {
+  async getAllTags(dramaId: number | undefined, userId: number) {
+    const accessibleDramaIds = await this.getAccessibleDramaIds(dramaId, userId);
+    if (accessibleDramaIds.length === 0) {
+      return [];
+    }
+
+    const where: any = { dramaId: In(accessibleDramaIds) };
+
     const [annotations, materials, performances, scripts, tasks] = await Promise.all([
-      this.annotationRepo.find({ select: ['tag', 'tagColor'] }),
-      this.materialRepo.find({ select: ['tags'] }),
-      this.performanceRepo.find({ select: ['tags'] }),
-      this.scriptRepo.find({ select: ['tags'] }),
-      this.taskRepo.find({ select: ['tags'] }),
+      this.annotationRepo.find({ where, select: ['tag', 'tagColor'] }),
+      this.materialRepo.find({ where, select: ['tags'] }),
+      this.performanceRepo.find({ where, select: ['tags'] }),
+      this.scriptRepo.find({ where, select: ['tags'] }),
+      this.taskRepo.find({ where, select: ['tags'] }),
     ]);
 
     const tagMap = new Map<string, string | null>();

@@ -30,6 +30,8 @@ import {
   Equipment,
   RoomReservation,
   Announcement,
+  Drama,
+  DramaPermission,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -53,6 +55,7 @@ import { EquipmentModule } from './equipment/equipment.module';
 import { RoomReservationsModule } from './room-reservations/room-reservations.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { ReportsModule } from './reports/reports.module';
+import { DramasModule } from './dramas/dramas.module';
 
 @Module({
   imports: [
@@ -89,11 +92,14 @@ import { ReportsModule } from './reports/reports.module';
         Equipment,
         RoomReservation,
         Announcement,
+        Drama,
+        DramaPermission,
       ],
       synchronize: true,
     }),
     AuthModule,
     UsersModule,
+    DramasModule,
     RehearsalsModule,
     RolesModule,
     AnnotationsModule,

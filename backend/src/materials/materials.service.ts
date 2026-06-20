@@ -1,9 +1,10 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Material, Rehearsal, Annotation, AuditAction, AuditModule } from '../entities';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { DramasService } from '../dramas/dramas.service';
 import { extname, join } from 'path';
 import { unlinkSync, existsSync } from 'fs';
 
@@ -37,21 +38,32 @@ export class MaterialsService {
     private annotationRepo: Repository<Annotation>,
     private auditLogsService: AuditLogsService,
     private notificationsService: NotificationsService,
+    private dramasService: DramasService,
   ) {}
 
-  async checkDuplicate(filename: string): Promise<DuplicateCheckResult> {
-    let materials = await this.repo
+  async checkDuplicate(filename: string, dramaId?: number): Promise<DuplicateCheckResult> {
+    let qb = this.repo
       .createQueryBuilder('m')
       .where('m.baseName = :baseName', { baseName: filename })
-      .orderBy('m.version', 'ASC')
-      .getMany();
+      .orderBy('m.version', 'ASC');
+
+    if (dramaId) {
+      qb = qb.andWhere('m.dramaId = :dramaId', { dramaId });
+    }
+
+    let materials = await qb.getMany();
 
     if (materials.length === 0) {
-      materials = await this.repo
+      let qb2 = this.repo
         .createQueryBuilder('m')
         .where('m.baseName IS NULL AND m.originalName = :originalName', { originalName: filename })
-        .orderBy('m.id', 'ASC')
-        .getMany();
+        .orderBy('m.id', 'ASC');
+
+      if (dramaId) {
+        qb2 = qb2.andWhere('m.dramaId = :dramaId', { dramaId });
+      }
+
+      materials = await qb2.getMany();
 
       if (materials.length > 0) {
         for (const m of materials) {
@@ -83,12 +95,15 @@ export class MaterialsService {
 
   async create(
     data: Partial<Material>,
+    dramaId: number,
     operatorId?: number,
     operatorName?: string,
     onDuplicate?: 'new_version' | 'overwrite',
     overwriteTargetId?: number,
     uploadDir?: string,
   ) {
+    await this.dramasService.checkAccess(dramaId, operatorId!, ['owner', 'director', 'assistant_director', 'crew']);
+
     if (!data.baseName) {
       data.baseName = data.originalName;
     }
@@ -98,10 +113,10 @@ export class MaterialsService {
     }
 
     if (onDuplicate === 'new_version') {
-      return this.createNewVersion(data, operatorId, operatorName);
+      return this.createNewVersion(data, dramaId, operatorId, operatorName);
     }
 
-    const item = this.repo.create(data);
+    const item = this.repo.create({ ...data, dramaId });
     if (!item.categories || item.categories.length === 0) {
       item.categories = item.category ? [item.category] : ['general'];
     }
@@ -120,13 +135,14 @@ export class MaterialsService {
         operatorName,
         targetId: saved.id,
         targetType: 'material',
-        detail: `上传素材「${saved.originalName}」`,
+        detail: `在剧目 #${dramaId} 上传素材「${saved.originalName}」`,
         metadata: {
           originalName: saved.originalName,
           size: saved.size,
           mimeType: saved.mimeType,
           categories: saved.categories,
           version: saved.version,
+          dramaId,
         },
       });
 
@@ -142,14 +158,20 @@ export class MaterialsService {
 
   private async createNewVersion(
     data: Partial<Material>,
+    dramaId: number,
     operatorId?: number,
     operatorName?: string,
   ) {
-    const existing = await this.repo
+    let qb = this.repo
       .createQueryBuilder('m')
       .where('m.baseName = :baseName', { baseName: data.baseName })
-      .orderBy('m.version', 'DESC')
-      .getOne();
+      .orderBy('m.version', 'DESC');
+
+    if (dramaId) {
+      qb = qb.andWhere('m.dramaId = :dramaId', { dramaId });
+    }
+
+    const existing = await qb.getOne();
 
     const baseName = data.baseName || data.originalName || '';
     const newVersion = existing ? existing.version + 1 : 1;
@@ -157,6 +179,7 @@ export class MaterialsService {
 
     const item = this.repo.create({
       ...data,
+      dramaId,
       originalName: versionedName,
       version: newVersion,
     });
@@ -176,12 +199,13 @@ export class MaterialsService {
         operatorName,
         targetId: saved.id,
         targetType: 'material',
-        detail: `上传素材新版本「${saved.originalName}」(v${saved.version})`,
+        detail: `在剧目 #${dramaId} 上传素材新版本「${saved.originalName}」(v${saved.version})`,
         metadata: {
           originalName: saved.originalName,
           baseName: saved.baseName,
           size: saved.size,
           version: saved.version,
+          dramaId,
         },
       });
 
@@ -205,6 +229,9 @@ export class MaterialsService {
     const existing = await this.repo.findOne({ where: { id: targetId } });
     if (!existing) {
       throw new HttpException('目标素材不存在', HttpStatus.NOT_FOUND);
+    }
+    if (existing.dramaId) {
+      await this.dramasService.checkAccess(existing.dramaId, operatorId!, ['owner', 'director', 'assistant_director', 'crew']);
     }
 
     const oldStoredName = existing.storedName;
@@ -244,6 +271,7 @@ export class MaterialsService {
           version: saved.version,
           oldStoredName,
           newStoredName: saved.storedName,
+          dramaId: existing.dramaId,
         },
       });
 
@@ -257,8 +285,25 @@ export class MaterialsService {
     return saved;
   }
 
-  async findAll(params?: { categories?: string; tags?: string; keyword?: string }) {
-    let qb = this.repo.createQueryBuilder('m').orderBy('m.createdAt', 'DESC');
+  async findAll(
+    dramaId: number | undefined,
+    userId: number,
+    params?: { categories?: string; tags?: string; keyword?: string },
+  ) {
+    let dramaIds: number[];
+    if (dramaId) {
+      await this.dramasService.checkAccess(dramaId, userId, ['viewer']);
+      dramaIds = [dramaId];
+    } else {
+      dramaIds = await this.dramasService.getUserDramaIds(userId);
+    }
+
+    if (dramaIds.length === 0) return [];
+
+    let qb = this.repo
+      .createQueryBuilder('m')
+      .where('m.dramaId IN (:...dramaIds)', { dramaIds })
+      .orderBy('m.createdAt', 'DESC');
 
     if (params?.categories) {
       const cats = params.categories.split(',').map((c) => c.trim()).filter(Boolean);
@@ -290,31 +335,54 @@ export class MaterialsService {
     return qb.getMany();
   }
 
-  async findByCategory(category: string) {
+  async findAllCrossDrama(
+    userId: number,
+    params?: { categories?: string; tags?: string; keyword?: string },
+  ) {
+    return this.findAll(undefined, userId, params);
+  }
+
+  async findByCategory(category: string, dramaId: number | undefined, userId: number) {
+    let dramaIds: number[];
+    if (dramaId) {
+      await this.dramasService.checkAccess(dramaId, userId, ['viewer']);
+      dramaIds = [dramaId];
+    } else {
+      dramaIds = await this.dramasService.getUserDramaIds(userId);
+    }
+
+    if (dramaIds.length === 0) return [];
+
     return this.repo
       .createQueryBuilder('m')
-      .where('m.categories LIKE :cat', { cat: `%"${category}"%` })
-      .orWhere('m.category = :category', { category })
+      .where('m.dramaId IN (:...dramaIds)', { dramaIds })
+      .andWhere('(m.categories LIKE :cat OR m.category = :category)', { cat: `%"${category}"%`, category })
       .orderBy('m.createdAt', 'DESC')
       .getMany();
   }
 
-  async findOne(id: number) {
-    return this.repo.findOne({ where: { id } });
-  }
-
-  async findOneWithReferences(id: number) {
+  async findOne(id: number, userId: number) {
     const material = await this.repo.findOne({ where: { id } });
     if (!material) return null;
+    if (material.dramaId) {
+      await this.dramasService.checkAccess(material.dramaId, userId, ['viewer']);
+    }
+    return material;
+  }
 
-    const references = await this.getReferences(id);
+  async findOneWithReferences(id: number, userId: number) {
+    const material = await this.findOne(id, userId);
+    if (!material) return null;
+
+    const references = await this.getReferences(id, material.dramaId);
     return { ...material, references };
   }
 
-  async getReferences(materialId: number): Promise<MaterialReference[]> {
+  async getReferences(materialId: number, dramaId?: number): Promise<MaterialReference[]> {
     const references: MaterialReference[] = [];
 
-    const rehearsals = await this.rehearsalRepo.find();
+    const where: any = dramaId ? { dramaId } : {};
+    const rehearsals = await this.rehearsalRepo.find({ where });
     for (const r of rehearsals) {
       if (r.materialIds && Array.isArray(r.materialIds) && r.materialIds.includes(materialId)) {
         references.push({
@@ -326,7 +394,7 @@ export class MaterialsService {
       }
     }
 
-    const annotations = await this.annotationRepo.find();
+    const annotations = await this.annotationRepo.find({ where });
     for (const a of annotations) {
       if (a.materialIds && Array.isArray(a.materialIds) && a.materialIds.includes(materialId)) {
         references.push({
@@ -341,13 +409,14 @@ export class MaterialsService {
     return references;
   }
 
-  async getReferenceCount(materialId: number): Promise<{ rehearsals: number; annotations: number; total: number }> {
-    const rehearsals = await this.rehearsalRepo.find();
+  async getReferenceCount(materialId: number, dramaId?: number): Promise<{ rehearsals: number; annotations: number; total: number }> {
+    const where: any = dramaId ? { dramaId } : {};
+    const rehearsals = await this.rehearsalRepo.find({ where });
     const rehearsalCount = rehearsals.filter(
       (r) => r.materialIds && Array.isArray(r.materialIds) && r.materialIds.includes(materialId),
     ).length;
 
-    const annotations = await this.annotationRepo.find();
+    const annotations = await this.annotationRepo.find({ where });
     const annotationCount = annotations.filter(
       (a) => a.materialIds && Array.isArray(a.materialIds) && a.materialIds.includes(materialId),
     ).length;
@@ -355,8 +424,8 @@ export class MaterialsService {
     return { rehearsals: rehearsalCount, annotations: annotationCount, total: rehearsalCount + annotationCount };
   }
 
-  async canDownload(materialId: number, userRole: string): Promise<boolean> {
-    const material = await this.findOne(materialId);
+  async canDownload(materialId: number, userRole: string, userId: number): Promise<boolean> {
+    const material = await this.findOne(materialId, userId);
     if (!material) return false;
     if (!material.downloadRoles || material.downloadRoles.length === 0) return true;
     return material.downloadRoles.includes(userRole);
@@ -364,8 +433,13 @@ export class MaterialsService {
 
   async update(id: number, data: Partial<Material>, operatorId?: number, operatorName?: string) {
     const oldMaterial = await this.repo.findOne({ where: { id } });
+    if (!oldMaterial) return null;
+    if (oldMaterial.dramaId) {
+      await this.dramasService.checkAccess(oldMaterial.dramaId, operatorId!, ['owner', 'director', 'assistant_director', 'crew']);
+    }
+
     await this.repo.update(id, data);
-    const updated = await this.findOne(id);
+    const updated = await this.findOne(id, operatorId!);
 
     if (oldMaterial && operatorId !== undefined) {
       const changes: string[] = [];
@@ -392,7 +466,7 @@ export class MaterialsService {
         detail: changes.length > 0
           ? `更新素材「${oldMaterial.originalName}」: ${changes.join('; ')}`
           : `更新素材「${oldMaterial.originalName}」`,
-        metadata: { old: oldMaterial, new: data },
+        metadata: { old: oldMaterial, new: data, dramaId: oldMaterial.dramaId },
       });
 
       this.notificationsService.notifyMaterialUpdate(
@@ -406,7 +480,13 @@ export class MaterialsService {
   }
 
   async remove(id: number, operatorId?: number, operatorName?: string) {
-    const refCount = await this.getReferenceCount(id);
+    const oldMaterial = await this.repo.findOne({ where: { id } });
+    if (!oldMaterial) return null;
+    if (oldMaterial.dramaId) {
+      await this.dramasService.checkAccess(oldMaterial.dramaId, operatorId!, ['owner', 'director']);
+    }
+
+    const refCount = await this.getReferenceCount(id, oldMaterial.dramaId);
     if (refCount.total > 0) {
       throw new HttpException(
         `该素材正在被 ${refCount.rehearsals} 个排练和 ${refCount.annotations} 个批注引用，无法删除`,
@@ -428,6 +508,7 @@ export class MaterialsService {
           originalName: material.originalName,
           size: material.size,
           categories: material.categories,
+          dramaId: material.dramaId,
         },
       });
 
@@ -441,8 +522,18 @@ export class MaterialsService {
     return this.repo.delete(id);
   }
 
-  async getAllCategories(): Promise<string[]> {
-    const materials = await this.repo.find();
+  async getAllCategories(dramaId: number | undefined, userId: number): Promise<string[]> {
+    let dramaIds: number[];
+    if (dramaId) {
+      await this.dramasService.checkAccess(dramaId, userId, ['viewer']);
+      dramaIds = [dramaId];
+    } else {
+      dramaIds = await this.dramasService.getUserDramaIds(userId);
+    }
+
+    if (dramaIds.length === 0) return [];
+
+    const materials = await this.repo.find({ where: { dramaId: In(dramaIds) } });
     const catSet = new Set<string>();
     materials.forEach((m) => {
       if (m.categories) m.categories.forEach((c) => catSet.add(c));
@@ -451,8 +542,18 @@ export class MaterialsService {
     return Array.from(catSet).sort();
   }
 
-  async getAllTags(): Promise<string[]> {
-    const materials = await this.repo.find();
+  async getAllTags(dramaId: number | undefined, userId: number): Promise<string[]> {
+    let dramaIds: number[];
+    if (dramaId) {
+      await this.dramasService.checkAccess(dramaId, userId, ['viewer']);
+      dramaIds = [dramaId];
+    } else {
+      dramaIds = await this.dramasService.getUserDramaIds(userId);
+    }
+
+    if (dramaIds.length === 0) return [];
+
+    const materials = await this.repo.find({ where: { dramaId: In(dramaIds) } });
     const tagSet = new Set<string>();
     materials.forEach((m) => {
       if (m.tags) m.tags.forEach((t) => tagSet.add(t));
@@ -463,9 +564,13 @@ export class MaterialsService {
   async enrichWithReferenceCounts(materials: Material[]) {
     const result: any[] = [];
     for (const m of materials) {
-      const refCount = await this.getReferenceCount(m.id);
+      const refCount = await this.getReferenceCount(m.id, m.dramaId);
       result.push({ ...m, referenceCount: refCount });
     }
     return result;
+  }
+
+  async getStatsByDrama(dramaId: number): Promise<number> {
+    return this.repo.count({ where: { dramaId } });
   }
 }

@@ -1,16 +1,18 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Material, Rehearsal, Annotation } from '../entities';
 import { MaterialsService } from './materials.service';
 import { MaterialsController } from './materials.controller';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { DramasModule } from '../dramas/dramas.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Material, Rehearsal, Annotation]),
-    AuditLogsModule,
+    forwardRef(() => AuditLogsModule),
     NotificationsModule,
+    forwardRef(() => DramasModule),
   ],
   providers: [MaterialsService],
   controllers: [MaterialsController],

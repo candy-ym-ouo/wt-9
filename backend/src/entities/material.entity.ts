@@ -39,6 +39,9 @@ export class Material {
   description: string;
 
   @Column({ nullable: true })
+  dramaId: number;
+
+  @Column({ nullable: true })
   createdBy: number;
 
   @CreateDateColumn()

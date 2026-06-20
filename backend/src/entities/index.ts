@@ -25,3 +25,5 @@ export { RehearsalRoom, RoomStatus } from './rehearsal-room.entity';
 export { Equipment, EquipmentStatus } from './equipment.entity';
 export { RoomReservation, ReservationStatus, ReservationPurpose } from './room-reservation.entity';
 export { Announcement, AnnouncementCategory, AnnouncementStatus } from './announcement.entity';
+export { Drama, DramaStatus } from './drama.entity';
+export { DramaPermission, DramaRole } from './drama-permission.entity';
