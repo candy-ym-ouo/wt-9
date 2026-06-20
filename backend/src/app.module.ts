@@ -29,6 +29,7 @@ import {
   RehearsalRoom,
   Equipment,
   RoomReservation,
+  Announcement,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -50,6 +51,7 @@ import { BudgetModule } from './budget/budget.module';
 import { RehearsalRoomsModule } from './rehearsal-rooms/rehearsal-rooms.module';
 import { EquipmentModule } from './equipment/equipment.module';
 import { RoomReservationsModule } from './room-reservations/room-reservations.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
 
 @Module({
   imports: [
@@ -85,6 +87,7 @@ import { RoomReservationsModule } from './room-reservations/room-reservations.mo
         RehearsalRoom,
         Equipment,
         RoomReservation,
+        Announcement,
       ],
       synchronize: true,
     }),
@@ -108,6 +111,7 @@ import { RoomReservationsModule } from './room-reservations/room-reservations.mo
     RehearsalRoomsModule,
     EquipmentModule,
     RoomReservationsModule,
+    AnnouncementsModule,
   ],
 })
 export class AppModule {}

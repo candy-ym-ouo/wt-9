@@ -24,3 +24,4 @@ export { MaterialPurchase, PurchaseStatus } from './material-purchase.entity';
 export { RehearsalRoom, RoomStatus } from './rehearsal-room.entity';
 export { Equipment, EquipmentStatus } from './equipment.entity';
 export { RoomReservation, ReservationStatus, ReservationPurpose } from './room-reservation.entity';
+export { Announcement, AnnouncementCategory, AnnouncementStatus } from './announcement.entity';
