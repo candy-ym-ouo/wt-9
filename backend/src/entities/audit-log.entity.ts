@@ -104,6 +104,12 @@ export enum AuditAction {
   CREATE_ANNOTATION = 'create_annotation',
   UPDATE_ANNOTATION = 'update_annotation',
   DELETE_ANNOTATION = 'delete_annotation',
+  CREATE_APPROVAL = 'create_approval',
+  CANCEL_APPROVAL = 'cancel_approval',
+  APPROVE_APPROVAL = 'approve_approval',
+  REJECT_APPROVAL = 'reject_approval',
+  APPROVE_APPROVAL_STEP = 'approve_approval_step',
+  REJECT_APPROVAL_STEP = 'reject_approval_step',
 }
 
 export enum AuditModule {
@@ -126,6 +132,7 @@ export enum AuditModule {
   ANNOUNCEMENT = 'announcement',
   DRAMA = 'drama',
   ANNOTATION = 'annotation',
+  APPROVAL = 'approval',
 }
 
 @Entity('audit_logs')

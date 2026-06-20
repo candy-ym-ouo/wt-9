@@ -27,3 +27,4 @@ export { RoomReservation, ReservationStatus, ReservationPurpose } from './room-r
 export { Announcement, AnnouncementCategory, AnnouncementStatus } from './announcement.entity';
 export { Drama, DramaStatus } from './drama.entity';
 export { DramaPermission, DramaRole } from './drama-permission.entity';
+export { Approval, ApprovalType, ApprovalStatus, ApprovalStepStatus } from './approval.entity';

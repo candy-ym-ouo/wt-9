@@ -32,6 +32,7 @@ import {
   Announcement,
   Drama,
   DramaPermission,
+  Approval,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -56,6 +57,7 @@ import { RoomReservationsModule } from './room-reservations/room-reservations.mo
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { ReportsModule } from './reports/reports.module';
 import { DramasModule } from './dramas/dramas.module';
+import { ApprovalsModule } from './approvals/approvals.module';
 
 @Module({
   imports: [
@@ -94,6 +96,7 @@ import { DramasModule } from './dramas/dramas.module';
         Announcement,
         Drama,
         DramaPermission,
+        Approval,
       ],
       synchronize: true,
     }),
@@ -120,6 +123,7 @@ import { DramasModule } from './dramas/dramas.module';
     RoomReservationsModule,
     AnnouncementsModule,
     ReportsModule,
+    ApprovalsModule,
   ],
 })
 export class AppModule {}
