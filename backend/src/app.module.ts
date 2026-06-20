@@ -22,6 +22,7 @@ import {
   RehearsalAvailability,
   RehearsalAvailabilityException,
   HistoricalRole,
+  Task,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -38,6 +39,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { PerformancesModule } from './performances/performances.module';
 import { ScriptsModule } from './scripts/scripts.module';
 import { ActorProfilesModule } from './actor-profiles/actor-profiles.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
@@ -66,6 +68,7 @@ import { ActorProfilesModule } from './actor-profiles/actor-profiles.module';
         RehearsalAvailability,
         RehearsalAvailabilityException,
         HistoricalRole,
+        Task,
       ],
       synchronize: true,
     }),
@@ -84,6 +87,7 @@ import { ActorProfilesModule } from './actor-profiles/actor-profiles.module';
     PerformancesModule,
     ScriptsModule,
     ActorProfilesModule,
+    TasksModule,
   ],
 })
 export class AppModule {}

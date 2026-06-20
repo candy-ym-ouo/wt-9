@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
-import { Rehearsal, CastRole, Annotation, Material, Performance, Script, ScriptChapter, ScriptScene } from '../entities';
+import { Rehearsal, CastRole, Annotation, Material, Performance, Script, ScriptChapter, ScriptScene, Task } from '../entities';
 import { RehearsalsService } from '../rehearsals/rehearsals.service';
 import { RolesService } from '../roles/roles.service';
 import { AnnotationsService } from '../annotations/annotations.service';
 import { MaterialsService } from '../materials/materials.service';
 import { PerformancesService } from '../performances/performances.service';
 import { ScriptsService } from '../scripts/scripts.service';
+import { TasksService } from '../tasks/tasks.service';
 
 interface AdvancedSearchParams {
   query?: string;
@@ -40,6 +41,7 @@ const ENTITY_DATE_FIELDS: Record<string, string[]> = {
   script: ['createdAt', 'updatedAt'],
   chapter: ['createdAt', 'updatedAt'],
   scene: ['createdAt', 'updatedAt'],
+  task: ['createdAt', 'updatedAt', 'dueDate'],
 };
 
 @Injectable()
@@ -61,12 +63,15 @@ export class SearchService {
     private chapterRepo: Repository<ScriptChapter>,
     @InjectRepository(ScriptScene)
     private sceneRepo: Repository<ScriptScene>,
+    @InjectRepository(Task)
+    private taskRepo: Repository<Task>,
     private rehearsalsService: RehearsalsService,
     private rolesService: RolesService,
     private annotationsService: AnnotationsService,
     private materialsService: MaterialsService,
     private performancesService: PerformancesService,
     private scriptsService: ScriptsService,
+    private tasksService: TasksService,
   ) {}
 
   private resolveDateColumn(entityType: string, dateField: string): string {
@@ -84,7 +89,7 @@ export class SearchService {
   async advancedSearch(params: AdvancedSearchParams) {
     const {
       query,
-      modules = ['rehearsals', 'roles', 'annotations', 'materials', 'performances', 'scripts'],
+      modules = ['rehearsals', 'roles', 'annotations', 'materials', 'performances', 'scripts', 'tasks'],
       dateFrom,
       dateTo,
       dateField = 'createdAt',
@@ -136,7 +141,13 @@ export class SearchService {
       searches.push(Promise.resolve([]));
     }
 
-    const [rehearsals, roles, annotations, materials, performances, scripts] = await Promise.all(searches);
+    if (modules.includes('tasks')) {
+      searches.push(this.searchTasks(likeQuery, dateRange, dateField, tags));
+    } else {
+      searches.push(Promise.resolve([]));
+    }
+
+    const [rehearsals, roles, annotations, materials, performances, scripts, tasks] = await Promise.all(searches);
 
     const rehearsalsWithConflicts = await this.rehearsalsService.enrichWithConflictInfo(rehearsals);
     const rehearsalsWithParticipants = await this.rehearsalsService.enrichWithParticipantInfo(rehearsals);
@@ -176,6 +187,12 @@ export class SearchService {
           raw: s,
         }));
 
+    const enrichedTasks = tasks.length > 0
+      ? await this.tasksService.findAll()
+      : [];
+    const matchedTaskIds = new Set(tasks.map((t) => t.id));
+    const filteredTasks = enrichedTasks.filter((t: any) => matchedTaskIds.has(t.id));
+
     const result = {
       rehearsals: enrichedRehearsals,
       roles: enrichedRoles,
@@ -183,7 +200,8 @@ export class SearchService {
       materials: enrichedMaterials,
       performances: finalPerformances,
       scripts: scriptSearchResults,
-      total: enrichedRehearsals.length + enrichedRoles.length + highlightedAnnotations.length + enrichedMaterials.length + finalPerformances.length + scriptSearchResults.length,
+      tasks: filteredTasks,
+      total: enrichedRehearsals.length + enrichedRoles.length + highlightedAnnotations.length + enrichedMaterials.length + finalPerformances.length + scriptSearchResults.length + filteredTasks.length,
     };
 
     if (!groupByModule) {
@@ -457,6 +475,49 @@ export class SearchService {
     return qb.getMany();
   }
 
+  private async searchTasks(
+    likeQuery: string | null,
+    dateRange: { from?: Date; to?: Date } | null,
+    dateField: string,
+    tags?: string[],
+  ) {
+    const qb = this.taskRepo.createQueryBuilder('t');
+
+    const conditions: string[] = [];
+    const params: any = {};
+
+    if (likeQuery) {
+      conditions.push('(t.title LIKE :q OR t.description LIKE :q OR t.category LIKE :q OR t.tags LIKE :q)');
+      params.q = likeQuery;
+    }
+
+    if (tags && tags.length > 0) {
+      const tagConditions: string[] = [];
+      tags.forEach((tag, i) => {
+        tagConditions.push(`t.tags LIKE :tag${i}`);
+        params[`tag${i}`] = `%${tag}%`;
+      });
+      conditions.push(`(${tagConditions.join(' OR ')})`);
+    }
+
+    const dateFieldName = this.resolveDateColumn('task', dateField);
+
+    if (dateRange?.from) {
+      conditions.push(`t.${dateFieldName} >= :dateFrom`);
+      params.dateFrom = dateRange.from;
+    }
+    if (dateRange?.to) {
+      conditions.push(`t.${dateFieldName} <= :dateTo`);
+      params.dateTo = dateRange.to;
+    }
+
+    if (conditions.length > 0) {
+      qb.where(conditions.join(' AND '), params);
+    }
+
+    return qb.getMany();
+  }
+
   private flattenAndSort(result: any, sortBy: string, sortOrder: string, dateField: string, query?: string): SearchResultItem[] {
     const items: SearchResultItem[] = [];
 
@@ -532,6 +593,18 @@ export class SearchService {
       });
     });
 
+    (result.tasks || []).forEach((t: any) => {
+      items.push({
+        id: t.id,
+        type: 'task',
+        title: t.title,
+        description: t.description,
+        date: this.resolveDateValue(t, 'task', dateField),
+        tags: t.tags || [],
+        raw: t,
+      });
+    });
+
     items.sort((a, b) => {
       let comparison = 0;
 
@@ -581,11 +654,12 @@ export class SearchService {
   }
 
   async getAllTags() {
-    const [annotations, materials, performances, scripts] = await Promise.all([
+    const [annotations, materials, performances, scripts, tasks] = await Promise.all([
       this.annotationRepo.find({ select: ['tag', 'tagColor'] }),
       this.materialRepo.find({ select: ['tags'] }),
       this.performanceRepo.find({ select: ['tags'] }),
       this.scriptRepo.find({ select: ['tags'] }),
+      this.taskRepo.find({ select: ['tags'] }),
     ]);
 
     const tagMap = new Map<string, string | null>();
@@ -616,6 +690,14 @@ export class SearchService {
       if (s.tags && Array.isArray(s.tags)) {
         s.tags.forEach((t) => {
           if (!tagMap.has(t)) tagMap.set(t, null);
+        });
+      }
+    });
+
+    tasks.forEach((t) => {
+      if (t.tags && Array.isArray(t.tags)) {
+        t.tags.forEach((tag) => {
+          if (!tagMap.has(tag)) tagMap.set(tag, null);
         });
       }
     });

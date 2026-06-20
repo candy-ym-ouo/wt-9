@@ -17,3 +17,4 @@ export { ScriptVersion, ScriptVersionAction } from './script-version.entity';
 export { ActorProfile, ActorGender, ActorStatus } from './actor-profile.entity';
 export { RehearsalAvailability, RehearsalAvailabilityException, Weekday, AvailabilityType } from './rehearsal-availability.entity';
 export { HistoricalRole, HistoricalRoleStatus } from './historical-role.entity';
+export { Task, TaskCategory, TaskStatus, TaskPriority } from './task.entity';

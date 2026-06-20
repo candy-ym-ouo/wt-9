@@ -46,6 +46,14 @@ export enum AuditAction {
   DELETE_HISTORICAL_ROLE = 'delete_historical_role',
   BIND_ACTOR_MATERIAL = 'bind_actor_material',
   UNBIND_ACTOR_MATERIAL = 'unbind_actor_material',
+  CREATE_TASK = 'create_task',
+  UPDATE_TASK = 'update_task',
+  DELETE_TASK = 'delete_task',
+  ASSIGN_TASK = 'assign_task',
+  UPDATE_TASK_STATUS = 'update_task_status',
+  ADD_TASK_COMMENT = 'add_task_comment',
+  ADD_TASK_FOLLOWER = 'add_task_follower',
+  REMOVE_TASK_FOLLOWER = 'remove_task_follower',
 }
 
 export enum AuditModule {
@@ -56,6 +64,7 @@ export enum AuditModule {
   PERFORMANCE = 'performance',
   SCRIPT = 'script',
   ACTOR_PROFILE = 'actor_profile',
+  TASK = 'task',
 }
 
 @Entity('audit_logs')
