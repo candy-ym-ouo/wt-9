@@ -121,6 +121,7 @@ export enum AuditAction {
   VISITOR_DOWNLOAD = 'visitor_download',
   IMPORT_PREVIEW = 'import_preview',
   IMPORT_EXECUTE = 'import_execute',
+  EXPORT_DATA = 'export_data',
 }
 
 export enum AuditModule {
@@ -148,6 +149,7 @@ export enum AuditModule {
   SHARE = 'share',
   VISITOR = 'visitor',
   DATA_IMPORT = 'data_import',
+  DATA_EXPORT = 'data_export',
 }
 
 @Entity('audit_logs')
