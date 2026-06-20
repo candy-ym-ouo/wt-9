@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, In, MoreThan, LessThan, Brackets } from 'typeorm';
+import { Repository, In, MoreThan, Brackets } from 'typeorm';
 import {
   RoomReservation,
   ReservationStatus,
@@ -499,13 +499,16 @@ export class RoomReservationsService {
   }
 
   async getUsageStatistics(startDate: Date, endDate: Date) {
-    const reservations = await this.repo.find({
-      where: {
-        status: ReservationStatus.COMPLETED,
-        startTime: Between(new Date(startDate), new Date(endDate)),
-      },
-      relations: ['room'],
-    });
+    const queryStart = new Date(startDate);
+    const queryEnd = new Date(endDate);
+
+    const reservations = await this.repo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.room', 'room')
+      .where('r.status = :status', { status: ReservationStatus.COMPLETED })
+      .andWhere('r.startTime < :queryEnd', { queryEnd })
+      .andWhere('r.endTime > :queryStart', { queryStart })
+      .getMany();
 
     const totalReservations = reservations.length;
     let totalHours = 0;
@@ -514,7 +517,11 @@ export class RoomReservationsService {
     let totalParticipants = 0;
 
     for (const r of reservations) {
-      const hours = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / (1000 * 60 * 60);
+      const rStart = new Date(r.startTime);
+      const rEnd = new Date(r.endTime);
+      const effectiveStart = rStart < queryStart ? queryStart : rStart;
+      const effectiveEnd = rEnd > queryEnd ? queryEnd : rEnd;
+      const hours = (effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60);
       totalHours += hours;
       totalParticipants += r.participantCount;
 
@@ -530,7 +537,7 @@ export class RoomReservationsService {
     const allRooms = await this.roomRepo.find({ where: { status: RoomStatus.AVAILABLE } });
     const utilizationRates: Record<number, { name: string; rate: number }> = {};
 
-    const periodHours = (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60);
+    const periodHours = (queryEnd.getTime() - queryStart.getTime()) / (1000 * 60 * 60);
     for (const room of allRooms) {
       const stat = roomStats[room.id] || { count: 0, hours: 0, name: room.name };
       utilizationRates[room.id] = {
@@ -587,17 +594,20 @@ export class RoomReservationsService {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const where: any = {
-      startTime: MoreThan(startOfDay),
-      endTime: LessThan(endOfDay),
-      status: In([ReservationStatus.PENDING, ReservationStatus.CONFIRMED]),
-    };
-    if (roomId) where.roomId = roomId;
+    const qb = this.repo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.room', 'room')
+      .where('r.status IN (:...statuses)', {
+        statuses: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED],
+      })
+      .andWhere('r.startTime < :endOfDay', { endOfDay })
+      .andWhere('r.endTime > :startOfDay', { startOfDay })
+      .orderBy('r.startTime', 'ASC');
 
-    return this.repo.find({
-      where,
-      order: { startTime: 'ASC' },
-      relations: ['room'],
-    });
+    if (roomId) {
+      qb.andWhere('r.roomId = :roomId', { roomId });
+    }
+
+    return qb.getMany();
   }
 }

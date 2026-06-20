@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Brackets } from 'typeorm';
 import { RehearsalRoom, RoomStatus, AuditAction, AuditModule } from '../entities';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { RoomReservation, ReservationStatus } from '../entities/room-reservation.entity';
@@ -62,40 +62,19 @@ export class RehearsalRoomsService {
       order: { capacity: 'ASC' },
     });
 
-    const conflictingReservations = await this.reservationRepo.find({
-      where: {
-        status: ReservationStatus.CONFIRMED,
-        startTime: Between(new Date(startTime), new Date(endTime)),
-      },
-    });
+    const queryStart = new Date(startTime);
+    const queryEnd = new Date(endTime);
+
+    const overlappingReservations = await this.reservationRepo
+      .createQueryBuilder('r')
+      .where('r.status = :status', { status: ReservationStatus.CONFIRMED })
+      .andWhere('r.startTime < :queryEnd', { queryEnd })
+      .andWhere('r.endTime > :queryStart', { queryStart })
+      .getMany();
 
     const conflictRoomIds = new Set<number>();
-    for (const reservation of conflictingReservations) {
-      if (this.isTimeOverlap(
-        new Date(reservation.startTime),
-        new Date(reservation.endTime),
-        new Date(startTime),
-        new Date(endTime),
-      )) {
-        conflictRoomIds.add(reservation.roomId);
-      }
-    }
-
-    const endReservations = await this.reservationRepo.find({
-      where: {
-        status: ReservationStatus.CONFIRMED,
-        endTime: Between(new Date(startTime), new Date(endTime)),
-      },
-    });
-    for (const reservation of endReservations) {
-      if (this.isTimeOverlap(
-        new Date(reservation.startTime),
-        new Date(reservation.endTime),
-        new Date(startTime),
-        new Date(endTime),
-      )) {
-        conflictRoomIds.add(reservation.roomId);
-      }
+    for (const reservation of overlappingReservations) {
+      conflictRoomIds.add(reservation.roomId);
     }
 
     let availableRooms = rooms.filter((r) => !conflictRoomIds.has(r.id));
@@ -165,19 +144,26 @@ export class RehearsalRoomsService {
   }
 
   async getRoomUsageStats(roomId: number, startDate: Date, endDate: Date) {
-    const reservations = await this.reservationRepo.find({
-      where: {
-        roomId,
-        status: ReservationStatus.COMPLETED,
-        startTime: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
+    const queryStart = new Date(startDate);
+    const queryEnd = new Date(endDate);
+
+    const reservations = await this.reservationRepo
+      .createQueryBuilder('r')
+      .where('r.roomId = :roomId', { roomId })
+      .andWhere('r.status = :status', { status: ReservationStatus.COMPLETED })
+      .andWhere('r.startTime < :queryEnd', { queryEnd })
+      .andWhere('r.endTime > :queryStart', { queryStart })
+      .getMany();
 
     let totalHours = 0;
     const purposeStats: Record<string, number> = {};
 
     for (const r of reservations) {
-      const hours = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / (1000 * 60 * 60);
+      const rStart = new Date(r.startTime);
+      const rEnd = new Date(r.endTime);
+      const effectiveStart = rStart < queryStart ? queryStart : rStart;
+      const effectiveEnd = rEnd > queryEnd ? queryEnd : rEnd;
+      const hours = (effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60);
       totalHours += hours;
       purposeStats[r.purpose] = (purposeStats[r.purpose] || 0) + hours;
     }

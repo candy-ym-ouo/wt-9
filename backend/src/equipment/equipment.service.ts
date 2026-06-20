@@ -161,31 +161,45 @@ export class EquipmentService {
 
   async getEquipmentStats(startDate: Date, endDate: Date) {
     const allEquipment = await this.repo.find();
-    const reservations = await this.reservationRepo.find({
-      where: {
-        status: ReservationStatus.COMPLETED,
-        startTime: In([new Date(startDate), new Date(endDate)]),
-      },
-    });
+
+    const queryStart = new Date(startDate);
+    const queryEnd = new Date(endDate);
+
+    const reservations = await this.reservationRepo
+      .createQueryBuilder('r')
+      .where('r.status = :status', { status: ReservationStatus.COMPLETED })
+      .andWhere('r.startTime < :queryEnd', { queryEnd })
+      .andWhere('r.endTime > :queryStart', { queryStart })
+      .getMany();
 
     const usageCount: Record<number, number> = {};
+    const usageHours: Record<number, number> = {};
     for (const r of reservations) {
       if (r.equipmentIds) {
+        const rStart = new Date(r.startTime);
+        const rEnd = new Date(r.endTime);
+        const effectiveStart = rStart < queryStart ? queryStart : rStart;
+        const effectiveEnd = rEnd > queryEnd ? queryEnd : rEnd;
+        const hours = (effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60);
+
         r.equipmentIds.forEach((id) => {
           usageCount[id] = (usageCount[id] || 0) + 1;
+          usageHours[id] = (usageHours[id] || 0) + hours;
         });
       }
     }
 
-    const categoryStats: Record<string, { total: number; inUse: number }> = {};
+    const categoryStats: Record<string, { total: number; inUse: number; usageCount: number; usageHours: number }> = {};
     for (const e of allEquipment) {
       if (!categoryStats[e.category]) {
-        categoryStats[e.category] = { total: 0, inUse: 0 };
+        categoryStats[e.category] = { total: 0, inUse: 0, usageCount: 0, usageHours: 0 };
       }
       categoryStats[e.category].total++;
       if (e.status === EquipmentStatus.IN_USE) {
         categoryStats[e.category].inUse++;
       }
+      categoryStats[e.category].usageCount += usageCount[e.id] || 0;
+      categoryStats[e.category].usageHours += usageHours[e.id] || 0;
     }
 
     const statusStats = {
@@ -196,11 +210,25 @@ export class EquipmentService {
       lost: allEquipment.filter((e) => e.status === EquipmentStatus.LOST).length,
     };
 
+    const equipmentUsage = allEquipment.map((e) => ({
+      id: e.id,
+      name: e.name,
+      code: e.code,
+      category: e.category,
+      status: e.status,
+      usageCount: usageCount[e.id] || 0,
+      usageHours: parseFloat((usageHours[e.id] || 0).toFixed(2)),
+    }));
+
     return {
       total: allEquipment.length,
       statusStats,
       categoryStats,
       usageCount,
+      usageHours: Object.fromEntries(
+        Object.entries(usageHours).map(([k, v]) => [k, parseFloat(v.toFixed(2))]),
+      ),
+      equipmentUsage,
     };
   }
 }
