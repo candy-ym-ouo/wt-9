@@ -41,3 +41,4 @@ export {
   PerformanceReviewPriority,
   PerformanceReviewSeverity,
 } from './performance-review.entity';
+export { PermissionTemplate, TemplateType, TemplateTargetScope, TemplateDramaRole } from './permission-template.entity';

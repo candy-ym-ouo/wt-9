@@ -40,6 +40,7 @@ import {
   Visitor,
   VisitorAccessLog,
   PerformanceReview,
+  PermissionTemplate,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -71,6 +72,7 @@ import { VisitorCollaborationModule } from './visitor-collaboration/visitor-coll
 import { DataImportModule } from './data-import/data-import.module';
 import { DataExportModule } from './data-export/data-export.module';
 import { PerformanceReviewsModule } from './performance-reviews/performance-reviews.module';
+import { PermissionTemplatesModule } from './permission-templates/permission-templates.module';
 
 @Module({
   imports: [
@@ -117,6 +119,7 @@ import { PerformanceReviewsModule } from './performance-reviews/performance-revi
         Visitor,
         VisitorAccessLog,
         PerformanceReview,
+        PermissionTemplate,
       ],
       synchronize: true,
       logging: true,
@@ -151,6 +154,7 @@ import { PerformanceReviewsModule } from './performance-reviews/performance-revi
     DataImportModule,
     DataExportModule,
     PerformanceReviewsModule,
+    PermissionTemplatesModule,
   ],
 })
 export class AppModule {}
