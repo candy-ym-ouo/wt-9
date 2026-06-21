@@ -270,22 +270,23 @@ export class PermissionTemplatesService {
       [TemplateDramaRole.VIEWER]: DramaRole.VIEWER,
     };
 
-    const dramaRole = roleMapping[template.dramaRole];
-    if (!dramaRole) throw new BadRequestException('无效的模板角色映射');
+    const targetDramaRole = roleMapping[template.dramaRole];
+    if (!targetDramaRole) throw new BadRequestException('无效的模板角色映射');
+
+    const templatePermissions = [...template.menus, ...template.operations];
 
     const results: DramaPermission[] = [];
     for (const userId of userIds) {
       const existing = await this.permissionRepo.findOne({ where: { dramaId, userId } });
       if (existing) {
-        existing.role = dramaRole;
-        existing.permissions = [...template.menus, ...template.operations];
+        existing.permissions = templatePermissions;
         results.push(await this.permissionRepo.save(existing));
       } else {
         const permission = this.permissionRepo.create({
           dramaId,
           userId,
-          role: dramaRole,
-          permissions: [...template.menus, ...template.operations],
+          role: targetDramaRole,
+          permissions: templatePermissions,
           grantedBy: operatorId,
         });
         results.push(await this.permissionRepo.save(permission));
@@ -300,7 +301,7 @@ export class PermissionTemplatesService {
       targetId: dramaId,
       targetType: 'drama',
       detail: `将权限模板「${template.name}」应用到剧目 #${dramaId}，涉及 ${userIds.length} 位用户`,
-      metadata: { templateId, templateName: template.name, dramaId, userIds, dramaRole },
+      metadata: { templateId, templateName: template.name, dramaId, userIds, dramaRole: targetDramaRole },
     });
 
     return results;
@@ -328,24 +329,19 @@ export class PermissionTemplatesService {
       [TemplateDramaRole.VIEWER]: DramaRole.VIEWER,
     };
 
-    const dramaRole = roleMapping[template.dramaRole];
+    const targetDramaRole = roleMapping[template.dramaRole];
+    const templatePermissions = [...template.menus, ...template.operations];
 
     const results: DramaPermission[] = [];
     for (const dramaId of dramaIds) {
       await this.dramasService.checkAccess(dramaId, operatorId, ['owner', 'director']);
 
-      const operatorPerm = await this.permissionRepo.findOne({ where: { dramaId, userId: operatorId } });
-      if (!operatorPerm) continue;
-
-      const targetUsers = await this.permissionRepo.find({ where: { dramaId } });
-      const lowerRoleUsers = targetUsers.filter((p) => {
-        const hierarchy: Record<string, number> = { owner: 100, director: 80, assistant_director: 60, actor: 40, crew: 30, viewer: 10 };
-        return (hierarchy[p.role] || 0) <= (hierarchy[dramaRole] || 0);
+      const matchingUsers = await this.permissionRepo.find({
+        where: { dramaId, role: targetDramaRole },
       });
 
-      for (const perm of lowerRoleUsers) {
-        perm.role = dramaRole;
-        perm.permissions = [...template.menus, ...template.operations];
+      for (const perm of matchingUsers) {
+        perm.permissions = templatePermissions;
         results.push(await this.permissionRepo.save(perm));
       }
     }
@@ -357,8 +353,8 @@ export class PermissionTemplatesService {
       operatorName,
       targetId: 0,
       targetType: 'team',
-      detail: `将团队权限模板「${template.name}」应用到 ${dramaIds.length} 个剧目`,
-      metadata: { templateId, templateName: template.name, dramaIds, dramaRole },
+      detail: `将团队权限模板「${template.name}」应用到 ${dramaIds.length} 个剧目，匹配角色 ${targetDramaRole}`,
+      metadata: { templateId, templateName: template.name, dramaIds, dramaRole: targetDramaRole },
     });
 
     return results;

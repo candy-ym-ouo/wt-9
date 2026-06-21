@@ -60,6 +60,12 @@ export default function AdminPage() {
     categories: '', tags: '', downloadRoles: [], description: '',
   });
 
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [teamDramas, setTeamDramas] = useState<any[]>([]);
+  const [teamTemplateId, setTeamTemplateId] = useState<number | null>(null);
+  const [teamDramaIds, setTeamDramaIds] = useState<number[]>([]);
+  const [teamApplying, setTeamApplying] = useState(false);
+
   const load = async () => {
     const [usersData, statsData, attendanceData, logsData, overviewData] = await Promise.all([
       api.users.list(),
@@ -80,7 +86,39 @@ export default function AdminPage() {
     setMaterials(data);
   };
 
-  useEffect(() => { load(); loadMaterials(); }, []);
+  useEffect(() => { load(); loadMaterials(); loadTemplates(); }, []);
+
+  const loadTemplates = async () => {
+    try {
+      const [dramaTpls, teamTpls] = await Promise.all([
+        api.permissionTemplates.list({ targetScope: 'drama' }),
+        api.permissionTemplates.list({ targetScope: 'team' }),
+      ]);
+      setTemplates([...dramaTpls, ...teamTpls]);
+    } catch {}
+  };
+
+  const loadTeamDramas = async () => {
+    try {
+      const list = await api.dramas.list();
+      setTeamDramas(list);
+    } catch {}
+  };
+
+  const handleTeamApply = async () => {
+    if (!teamTemplateId || teamDramaIds.length === 0) return;
+    setTeamApplying(true);
+    try {
+      await api.permissionTemplates.applyToTeam(teamTemplateId, teamDramaIds);
+      setTeamTemplateId(null);
+      setTeamDramaIds([]);
+      loadTemplates();
+    } catch (e: any) {
+      alert(e.message || '团队套用失败');
+    } finally {
+      setTeamApplying(false);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,6 +352,176 @@ export default function AdminPage() {
         </table>
       </div>
       {users.length === 0 && <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>暂无用户</div>}
+
+      <div style={{ marginTop: 32 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, color: '#e0e0e0', fontSize: 16 }}>📋 权限模板</h3>
+        </div>
+
+        {templates.length > 0 && (
+          <div style={{ background: '#1a1a1a', borderRadius: 8, border: '1px solid #333', overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <th style={thStyle}>模板名称</th>
+                  <th style={thStyle}>适用范围</th>
+                  <th style={thStyle}>角色</th>
+                  <th style={thStyle}>类型</th>
+                  <th style={thStyle}>菜单权限</th>
+                  <th style={thStyle}>操作权限</th>
+                  <th style={thStyle}>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {templates.map((t) => (
+                  <tr key={t.id} style={{ borderBottom: '1px solid #222' }}>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 500 }}>{t.name}</div>
+                      {t.description && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{t.description}</div>}
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ padding: '2px 6px', borderRadius: 4, background: t.targetScope === 'team' ? '#1a2a3a' : '#2a1515', color: t.targetScope === 'team' ? '#3498db' : '#e74c3c', fontSize: 11 }}>
+                        {t.targetScope === 'team' ? '团队' : '剧目'}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ padding: '2px 6px', borderRadius: 4, background: '#333', color: '#aaa', fontSize: 11 }}>
+                        {t.dramaRole === 'admin' ? '管理员' : t.dramaRole === 'director' ? '导演' : t.dramaRole === 'assistant_director' ? '副导演' : t.dramaRole === 'actor' ? '演员' : t.dramaRole === 'crew' ? '剧组' : '观众'}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ fontSize: 11, color: t.templateType === 'system' ? '#f39c12' : '#2ecc71' }}>
+                        {t.templateType === 'system' ? '系统' : '自定义'}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, maxWidth: 200 }}>
+                        {(t.menus || []).slice(0, 4).map((m: string) => (
+                          <span key={m} style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: '#2a1515', color: '#e74c3c' }}>{m}</span>
+                        ))}
+                        {(t.menus || []).length > 4 && (
+                          <span style={{ fontSize: 10, color: '#888' }}>+{t.menus.length - 4}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, maxWidth: 160 }}>
+                        {(t.operations || []).slice(0, 3).map((op: string) => (
+                          <span key={op} style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: '#1a2a3a', color: '#3498db' }}>{op}</span>
+                        ))}
+                        {(t.operations || []).length > 3 && (
+                          <span style={{ fontSize: 10, color: '#888' }}>+{t.operations.length - 3}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      {t.templateType !== 'system' && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`确定删除模板「${t.name}」？`)) return;
+                            try { await api.permissionTemplates.remove(t.id); loadTemplates(); } catch (e: any) { alert(e.message); }
+                          }}
+                          style={deleteBtnStyle}
+                        >
+                          删除
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ marginTop: 20, padding: 20, background: '#1a1a1a', borderRadius: 8, border: '1px solid #333' }}>
+          <h4 style={{ margin: '0 0 12px', color: '#e0e0e0', fontSize: 14 }}>🏗️ 团队快速套用</h4>
+          <p style={{ margin: '0 0 16px', fontSize: 12, color: '#888' }}>
+            选择团队级别模板和目标剧目，批量将模板权限应用到各剧目中匹配角色的成员。仅更新菜单与操作权限，不会修改成员角色。
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aaa', marginBottom: 6 }}>选择团队模板</label>
+              <select
+                value={teamTemplateId || ''}
+                onChange={(e) => setTeamTemplateId(e.target.value ? Number(e.target.value) : null)}
+                style={{ ...inputStyle, width: '100%' }}
+              >
+                <option value="">-- 请选择模板 --</option>
+                {templates
+                  .filter((t) => t.targetScope === 'team')
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}（{t.dramaRole === 'admin' ? '管理员' : t.dramaRole === 'director' ? '导演' : t.dramaRole === 'actor' ? '演员' : t.dramaRole}）
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aaa', marginBottom: 6 }}>
+                目标剧目（已选 {teamDramaIds.length} 个）
+              </label>
+              <button
+                onClick={loadTeamDramas}
+                style={{ ...inputStyle, width: '100%', cursor: 'pointer', textAlign: 'left' }}
+              >
+                {teamDramaIds.length > 0 ? `已选 ${teamDramaIds.length} 个剧目` : '点击加载剧目列表...'}
+              </button>
+            </div>
+          </div>
+
+          {teamDramas.length > 0 && (
+            <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {teamDramas.map((d) => (
+                <label
+                  key={d.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 10px',
+                    background: teamDramaIds.includes(d.id) ? '#1a2a3a' : '#0d0d0d',
+                    border: teamDramaIds.includes(d.id) ? '1px solid #3498db' : '1px solid #2a2a2a',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    color: '#e0e0e0',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={teamDramaIds.includes(d.id)}
+                    onChange={(e) =>
+                      setTeamDramaIds((prev) =>
+                        e.target.checked ? [...prev, d.id] : prev.filter((id) => id !== d.id),
+                      )
+                    }
+                  />
+                  {d.title}
+                </label>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={handleTeamApply}
+            disabled={!teamTemplateId || teamDramaIds.length === 0 || teamApplying}
+            style={{
+              padding: '8px 20px',
+              background: teamTemplateId && teamDramaIds.length > 0 && !teamApplying ? '#3498db' : '#333',
+              border: 'none',
+              borderRadius: 6,
+              color: teamTemplateId && teamDramaIds.length > 0 && !teamApplying ? '#fff' : '#666',
+              cursor: teamTemplateId && teamDramaIds.length > 0 && !teamApplying ? 'pointer' : 'not-allowed',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {teamApplying ? '套用中...' : '批量套用权限模板'}
+          </button>
+        </div>
+      </div>
 
       {auditLogs.length > 0 && (
         <div style={{ marginTop: 24 }}>

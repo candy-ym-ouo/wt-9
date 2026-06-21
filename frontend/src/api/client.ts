@@ -600,4 +600,36 @@ export const api = {
       triggerDownload(blob, filename);
     },
   },
+  permissionTemplates: {
+    list: (params?: { targetScope?: string; dramaId?: number }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.targetScope) searchParams.set('targetScope', params.targetScope);
+      if (params?.dramaId) searchParams.set('dramaId', String(params.dramaId));
+      const q = searchParams.toString();
+      return request<any[]>(`/permission-templates${q ? '?' + q : ''}`);
+    },
+    get: (id: number) => request<any>(`/permission-templates/${id}`),
+    create: (data: {
+      name: string;
+      description?: string;
+      targetScope: string;
+      dramaRole: string;
+      menus: string[];
+      operations: string[];
+      dramaId?: number;
+    }) => request<any>('/permission-templates', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<{ name: string; description: string; menus: string[]; operations: string[] }>) =>
+      request<any>(`/permission-templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => request<any>(`/permission-templates/${id}`, { method: 'DELETE' }),
+    applyToDrama: (templateId: number, dramaId: number, userIds: number[]) =>
+      request<any[]>(`/permission-templates/${templateId}/apply/drama`, {
+        method: 'POST',
+        body: JSON.stringify({ dramaId, userIds }),
+      }),
+    applyToTeam: (templateId: number, dramaIds: number[]) =>
+      request<any[]>(`/permission-templates/${templateId}/apply/team`, {
+        method: 'POST',
+        body: JSON.stringify({ dramaIds }),
+      }),
+  },
 };

@@ -28,7 +28,11 @@ export default function DramasPage() {
   const [permissions, setPermissions] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
-
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [applying, setApplying] = useState(false);
   const loadDramas = async () => {
     try {
       setLoading(true);
@@ -210,6 +214,33 @@ export default function DramasPage() {
       setPermissions(perms);
     } catch (e: any) {
       alert(e.message || '撤销权限失败');
+    }
+  };
+
+  const handleOpenTemplateModal = async () => {
+    try {
+      const list = await api.permissionTemplates.list({ targetScope: 'drama' });
+      setTemplates(list);
+      setSelectedTemplateId(null);
+      setSelectedUserIds(permissions.filter((p) => p.role !== 'owner').map((p) => p.userId));
+      setShowTemplateModal(true);
+    } catch (e: any) {
+      alert(e.message || '加载权限模板失败');
+    }
+  };
+
+  const handleApplyTemplate = async () => {
+    if (!selectedTemplateId || !selectedDrama || selectedUserIds.length === 0) return;
+    setApplying(true);
+    try {
+      await api.permissionTemplates.applyToDrama(selectedTemplateId, selectedDrama.id, selectedUserIds);
+      const perms = await api.dramas.getPermissions(selectedDrama.id);
+      setPermissions(perms);
+      setShowTemplateModal(false);
+    } catch (e: any) {
+      alert(e.message || '套用权限模板失败');
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -416,20 +447,36 @@ export default function DramasPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 style={{ margin: 0, fontSize: 14, color: '#e0e0e0' }}>👥 成员与权限</h3>
                 {canManage(selectedDrama) && (
-                  <button
-                    onClick={() => setShowMemberModal(true)}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid #e74c3c55',
-                      color: '#e74c3c',
-                      padding: '4px 12px',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      fontSize: 12,
-                    }}
-                  >
-                    + 添加成员
-                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleOpenTemplateModal}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid #3498db55',
+                        color: '#3498db',
+                        padding: '4px 12px',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        fontSize: 12,
+                      }}
+                    >
+                      📋 套用模板
+                    </button>
+                    <button
+                      onClick={() => setShowMemberModal(true)}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid #e74c3c55',
+                        color: '#e74c3c',
+                        padding: '4px 12px',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        fontSize: 12,
+                      }}
+                    >
+                      + 添加成员
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -819,6 +866,161 @@ export default function DramasPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showTemplateModal && selectedDrama && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: '#1a1a1a',
+              border: '1px solid #333',
+              borderRadius: 8,
+              padding: 24,
+              width: 560,
+              maxHeight: '85vh',
+              overflowY: 'auto',
+            }}
+          >
+            <h3 style={{ margin: '0 0 16px', color: '#3498db' }}>📋 套用权限模板</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: '#888' }}>
+              为剧目「{selectedDrama.title}」的成员批量套用权限模板，仅更新菜单与操作权限，不会修改成员角色。
+            </p>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 12, color: '#aaa', marginBottom: 6 }}>选择权限模板</label>
+              {templates.length === 0 ? (
+                <div style={{ padding: 16, textAlign: 'center', color: '#666', fontSize: 12, background: '#0d0d0d', borderRadius: 4 }}>
+                  暂无可用模板
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {templates.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => setSelectedTemplateId(t.id)}
+                      style={{
+                        padding: 12,
+                        background: selectedTemplateId === t.id ? '#1a2a3a' : '#0d0d0d',
+                        border: selectedTemplateId === t.id ? '1px solid #3498db' : '1px solid #2a2a2a',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, color: '#e0e0e0', fontWeight: 500 }}>{t.name}</span>
+                        <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: '#333', color: '#aaa' }}>
+                          {t.dramaRole === 'admin' ? '管理员' : t.dramaRole === 'director' ? '导演' : t.dramaRole === 'assistant_director' ? '副导演' : t.dramaRole === 'actor' ? '演员' : t.dramaRole === 'crew' ? '剧组' : '观众'}
+                        </span>
+                      </div>
+                      {t.description && <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>{t.description}</div>}
+                      {selectedTemplateId === t.id && (
+                        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {t.menus?.map((m: string) => (
+                            <span key={m} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#2a1515', color: '#e74c3c', border: '1px solid #3a2020' }}>{m}</span>
+                          ))}
+                          {t.operations?.map((op: string) => (
+                            <span key={op} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#1a2a3a', color: '#3498db', border: '1px solid #2a3a5a' }}>{op}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 12, color: '#aaa', marginBottom: 6 }}>
+                套用至成员（已选 {selectedUserIds.length} 人）
+              </label>
+              {permissions.length === 0 ? (
+                <div style={{ padding: 16, textAlign: 'center', color: '#666', fontSize: 12, background: '#0d0d0d', borderRadius: 4 }}>
+                  暂无成员可选
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+                  {permissions.map((p) => (
+                    <label
+                      key={p.userId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 8px',
+                        background: '#0d0d0d',
+                        borderRadius: 4,
+                        cursor: p.role === 'owner' ? 'not-allowed' : 'pointer',
+                        opacity: p.role === 'owner' ? 0.5 : 1,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(p.userId)}
+                        disabled={p.role === 'owner'}
+                        onChange={(e) => {
+                          if (p.role === 'owner') return;
+                          setSelectedUserIds((prev) =>
+                            e.target.checked ? [...prev, p.userId] : prev.filter((id) => id !== p.userId),
+                          );
+                        }}
+                      />
+                      <span style={{ fontSize: 12, color: '#e0e0e0' }}>
+                        {p.user?.displayName || p.user?.username || `用户 #${p.userId}`}
+                      </span>
+                      <span style={{ fontSize: 10, color: '#666', marginLeft: 'auto' }}>
+                        {DRAMA_ROLES.find((r) => r.value === p.role)?.label || p.role}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #444',
+                  color: '#aaa',
+                  padding: '8px 16px',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleApplyTemplate}
+                disabled={!selectedTemplateId || selectedUserIds.length === 0 || applying}
+                style={{
+                  background: selectedTemplateId && selectedUserIds.length > 0 && !applying ? '#3498db' : '#333',
+                  border: 'none',
+                  color: selectedTemplateId && selectedUserIds.length > 0 && !applying ? '#fff' : '#666',
+                  padding: '8px 20px',
+                  borderRadius: 4,
+                  cursor: selectedTemplateId && selectedUserIds.length > 0 && !applying ? 'pointer' : 'not-allowed',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                {applying ? '套用中...' : '确认套用'}
+              </button>
+            </div>
           </div>
         </div>
       )}
