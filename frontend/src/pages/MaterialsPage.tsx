@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useResponsive } from '../hooks/useResponsive';
+import BottomSheet from '../components/BottomSheet';
+import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import { colors, spacing, fontSize, radius } from '../styles/theme';
 
 interface MaterialReference {
   type: 'rehearsal' | 'annotation';
@@ -51,6 +56,7 @@ const ROLE_LABELS: Record<string, string> = { admin: '管理员', director: '导
 
 export default function MaterialsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isMobile, isTablet } = useResponsive();
   const [materials, setMaterials] = useState<Material[]>([]);
 
   const urlCats = searchParams.get('categories');
@@ -75,6 +81,8 @@ export default function MaterialsPage() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { isDirector, user } = useAuth();
+  const isAdmin = user?.role === 'admin' || isDirector;
+  const canEdit = isAdmin || isDirector || true;
 
   const [detailMaterial, setDetailMaterial] = useState<Material | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string; refs?: { rehearsals: number; annotations: number; total: number } } | null>(null);
@@ -383,24 +391,70 @@ export default function MaterialsPage() {
     );
   };
 
+  const filteredMaterials = materials;
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h2 style={{ margin: 0, color: '#e0e0e0' }}>素材库</h2>
-      </div>
+      <PageHeader
+        title="素材库"
+        subtitle={filteredMaterials.length > 0 ? `共 ${filteredMaterials.length} 个素材文件` : undefined}
+        rightAction={
+          canEdit ? (
+            <button
+              onClick={() => fileRef.current?.click()}
+              style={{
+                padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '10px 20px',
+                background: colors.primary,
+                border: 'none',
+                borderRadius: radius.md,
+                color: colors.textInverse,
+                cursor: 'pointer',
+                fontSize: isMobile ? fontSize.sm : 14,
+                fontWeight: 600,
+                minHeight: isMobile ? 40 : 0,
+                minWidth: isMobile ? 40 : 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: spacing.xs,
+              }}
+              title="上传素材"
+            >
+              {isMobile ? '📤' : '📤 上传素材'}
+            </button>
+          ) : null
+        }
+        sticky
+      />
 
-      <div style={{ background: '#1a1a1a', padding: 20, borderRadius: 8, border: '1px solid #333', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>分类筛选</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {!isMobile && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ margin: 0, color: colors.text }}>素材库</h2>
+        </div>
+      )}
+
+      <div style={{
+        background: colors.bgSecondary,
+        padding: isMobile ? spacing.lg : 20,
+        borderRadius: radius.md,
+        border: `1px solid ${colors.border}`,
+        marginBottom: isMobile ? spacing.lg : 16,
+      }}>
+        <div style={{ fontSize: isMobile ? fontSize.sm : 13, color: colors.textMuted, marginBottom: spacing.md, fontWeight: 500 }}>分类筛选</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
           {availableCategories.map((cat) => (
             <button
               key={cat}
               onClick={() => toggleFilterCat(cat)}
               style={{
                 ...chipStyle,
-                background: filterCats.includes(cat) ? '#e74c3c' : '#222',
-                color: filterCats.includes(cat) ? '#fff' : '#aaa',
-                borderColor: filterCats.includes(cat) ? '#e74c3c' : '#444',
+                minHeight: isMobile ? 36 : 0,
+                padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : chipStyle.padding,
+                fontSize: isMobile ? fontSize.sm : chipStyle.fontSize,
+                background: filterCats.includes(cat) ? colors.primary : colors.bgTertiary,
+                color: filterCats.includes(cat) ? colors.textInverse : colors.textSecondary,
+                borderColor: filterCats.includes(cat) ? colors.primary : colors.border,
+                borderRadius: radius.md,
               }}
             >
               {cat}
@@ -409,17 +463,23 @@ export default function MaterialsPage() {
         </div>
         {availableTags.length > 0 && (
           <>
-            <div style={{ fontSize: 13, color: '#888', marginTop: 12, marginBottom: 8 }}>标签筛选</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{
+              fontSize: isMobile ? fontSize.sm : 13, color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.sm, fontWeight: 500
+            }}>标签筛选</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
               {availableTags.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => toggleFilterTag(tag)}
                   style={{
                     ...chipStyle,
-                    background: filterTags.includes(tag) ? '#3498db' : '#222',
-                    color: filterTags.includes(tag) ? '#fff' : '#aaa',
-                    borderColor: filterTags.includes(tag) ? '#3498db' : '#444',
+                    minHeight: isMobile ? 36 : 0,
+                    padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : chipStyle.padding,
+                    fontSize: isMobile ? fontSize.sm : chipStyle.fontSize,
+                    background: filterTags.includes(tag) ? colors.info : colors.bgTertiary,
+                    color: filterTags.includes(tag) ? colors.textInverse : colors.textSecondary,
+                    borderColor: filterTags.includes(tag) ? colors.info : colors.border,
+                    borderRadius: radius.md,
                   }}
                 >
                   #{tag}
@@ -430,9 +490,9 @@ export default function MaterialsPage() {
         )}
 
         {systemTags.length > 0 && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #333' }}>
-            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>
-              🏷️ 统一标签筛选 {selectedSystemTagIds.length > 0 && <span style={{ color: '#3498db' }}>(已选 {selectedSystemTagIds.length} 个)</span>}
+          <div style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTop: `1px solid ${colors.border}` }}>
+            <div style={{ fontSize: isMobile ? fontSize.sm : 13, color: colors.textMuted, marginBottom: spacing.sm, fontWeight: 500 }}>
+              🏷️ 统一标签 {selectedSystemTagIds.length > 0 && <span style={{ color: colors.info }}>(已选 {selectedSystemTagIds.length})</span>}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {systemTags.map((tag) => {
@@ -456,13 +516,14 @@ export default function MaterialsPage() {
                       setSearchParams(params, { replace: true });
                     }}
                     style={{
-                      padding: '4px 12px',
+                      padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '4px 12px',
                       borderRadius: 14,
-                      border: `1px solid ${selected ? tag.color : '#444'}`,
+                      border: `1px solid ${selected ? tag.color : colors.border}`,
                       background: selected ? `${tag.color}20` : 'transparent',
-                      color: selected ? tag.color : '#aaa',
-                      fontSize: 12,
+                      color: selected ? tag.color : colors.textSecondary,
+                      fontSize: isMobile ? fontSize.sm : 12,
                       cursor: 'pointer',
+                      minHeight: isMobile ? 36 : 0,
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 6,
@@ -488,13 +549,14 @@ export default function MaterialsPage() {
                     setSearchParams(params, { replace: true });
                   }}
                   style={{
-                    padding: '4px 10px',
+                    padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '4px 10px',
                     borderRadius: 14,
-                    border: '1px solid #555',
+                    border: `1px solid ${colors.border}`,
                     background: 'transparent',
-                    color: '#888',
-                    fontSize: 12,
+                    color: colors.textMuted,
+                    fontSize: isMobile ? fontSize.sm : 12,
                     cursor: 'pointer',
+                    minHeight: isMobile ? 36 : 0,
                   }}
                 >
                   清除
@@ -503,17 +565,24 @@ export default function MaterialsPage() {
             </div>
           </div>
         )}
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: spacing.md }}>
           <input
             placeholder="搜索关键词..."
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            style={{ ...inputStyle, width: '100%' }}
+            style={{
+              ...inputStyle,
+              width: '100%',
+              minHeight: isMobile ? 44 : undefined,
+              padding: isMobile ? `${spacing.md}px ${spacing.md}px` : inputStyle.padding,
+              fontSize: isMobile ? fontSize.md : inputStyle.fontSize,
+              borderRadius: radius.md,
+            }}
           />
         </div>
       </div>
 
-      {isDirector && (
+      {canEdit && !isMobile && (
         <div style={{
           background: '#1a1a1a',
           padding: 20,
@@ -692,7 +761,39 @@ export default function MaterialsPage() {
           </div>
         ))}
       </div>
-      {materials.length === 0 && <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>暂无素材</div>}
+      {filteredMaterials.length === 0 && (
+        <div style={{ marginTop: isMobile ? spacing.xl : 0 }}>
+          <EmptyState
+            icon={keyword || filterCats.length > 0 || filterTags.length > 0 ? '🔍' : '📁'}
+            title={
+              keyword || filterCats.length > 0 || filterTags.length > 0
+                ? '未找到匹配的素材'
+                : materials.length === 0 ? '暂无素材' : '无符合条件的素材'
+            }
+            description={
+              keyword || filterCats.length > 0 || filterTags.length > 0
+                ? '尝试调整搜索关键词或筛选条件'
+                : canEdit
+                  ? '点击右上角上传按钮添加第一个素材文件'
+                  : '等待管理员上传素材内容'
+            }
+            primaryAction={
+              canEdit
+                ? {
+                    label: keyword || filterCats.length > 0 || filterTags.length > 0 ? '清除筛选' : '上传素材',
+                    onClick: keyword || filterCats.length > 0 || filterTags.length > 0
+                      ? () => {
+                          setKeyword('');
+                          setFilterCats([]);
+                          setFilterTags([]);
+                        }
+                      : () => fileRef.current?.click()
+                  }
+                : undefined
+            }
+          />
+        </div>
+      )}
 
       {duplicateModal && (
         <div style={modalOverlayStyle} onClick={handleDuplicateCancel}>

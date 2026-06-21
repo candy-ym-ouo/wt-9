@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useResponsive } from '../hooks/useResponsive';
+import BottomSheet from '../components/BottomSheet';
+import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import { colors, spacing, fontSize, radius } from '../styles/theme';
 
 interface TagInfo {
   name: string;
@@ -122,6 +127,10 @@ function saveFilterState(state: FilterState) {
 export default function AnnotationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isMobile, isTablet } = useResponsive();
+  const { user, isDirector } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'director';
+  const canEdit = isAdmin || isDirector || true;
 
   const saved = useMemo(() => loadFilterState(), []);
 
@@ -165,8 +174,6 @@ export default function AnnotationsPage() {
   const annotationRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const sceneRefs = useRef<Record<string, HTMLElement | null>>({});
   const colorInputRef = useRef<HTMLInputElement>(null);
-
-  const { user, isDirector } = useAuth();
 
   const canModify = (annotation: Annotation) => {
     if (isDirector) return true;
@@ -1032,39 +1039,121 @@ export default function AnnotationsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <h2 style={{ margin: 0, color: '#e0e0e0' }}>文本批注</h2>
-          {groupedData && (
-            <span style={{ fontSize: 12, color: '#888' }}>
-              共 {groupedData.totalCount} 条批注 · {groupedData.sceneCount} 个场次
-              {selectedTags.length > 0 && ` · 筛选 ${allAnnotationsFlat.length} 条`}
-            </span>
-          )}
+      <PageHeader
+        title="文本批注"
+        subtitle={groupedData
+          ? `共 ${groupedData.totalCount} 条批注 · ${groupedData.sceneCount} 个场次${
+              selectedTags.length > 0 ? ` · 筛选 ${allAnnotationsFlat.length} 条` : ''
+            }`
+          : undefined
+        }
+        rightAction={
+          canEdit ? (
+            <button
+              onClick={() => (isMobile ? setShowForm(true) : setShowForm(!showForm))}
+              style={{
+                padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '10px 20px',
+                background: colors.primary,
+                border: 'none',
+                borderRadius: radius.md,
+                color: colors.textInverse,
+                cursor: 'pointer',
+                fontSize: isMobile ? fontSize.sm : 14,
+                fontWeight: 600,
+                minHeight: isMobile ? 40 : 0,
+                minWidth: isMobile ? 40 : 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: spacing.xs,
+              }}
+              title={showForm ? '取消' : '新建批注'}
+            >
+              {showForm ? (isMobile ? '✕' : '取消') : isMobile ? '➕' : '+ 新批注'}
+            </button>
+          ) : null
+        }
+        sticky
+      />
+
+      {!isMobile && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+          flexWrap: 'wrap',
+          gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <h2 style={{ margin: 0, color: colors.text }}>文本批注</h2>
+            {groupedData && (
+              <span style={{ fontSize: 12, color: colors.textMuted }}>
+                共 {groupedData.totalCount} 条批注 · {groupedData.sceneCount} 个场次
+                {selectedTags.length > 0 && ` · 筛选 ${allAnnotationsFlat.length} 条`}
+              </span>
+            )}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 4, background: '#1a1a1a', border: '1px solid #333', borderRadius: 6, padding: 2 }}>
+      )}
+
+      <div style={{
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? spacing.md : 8,
+        marginBottom: isMobile ? spacing.lg : spacing.md,
+      }}>
+        <div style={{
+          display: 'flex',
+          flex: isMobile ? 1 : undefined,
+          gap: spacing.sm,
+          alignItems: 'center',
+        }}>
+          <div style={{
+            display: 'flex',
+            gap: 4,
+            background: colors.bgSecondary,
+            border: `1px solid ${colors.border}`,
+            borderRadius: radius.md,
+            padding: 2,
+          }}>
             <button
               onClick={() => setViewMode('grouped')}
               style={{
                 ...toggleBtnStyle,
-                background: viewMode === 'grouped' ? '#e74c3c' : 'transparent',
-                color: viewMode === 'grouped' ? '#fff' : '#888',
+                minHeight: isMobile ? 36 : 0,
+                padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : toggleBtnStyle.padding,
+                fontSize: isMobile ? fontSize.sm : toggleBtnStyle.fontSize,
+                background: viewMode === 'grouped' ? colors.primary : 'transparent',
+                color: viewMode === 'grouped' ? colors.textInverse : colors.textMuted,
+                borderRadius: isMobile ? radius.sm : toggleBtnStyle.borderRadius,
               }}
             >
-              🎬 场次视图
+              {isMobile ? '🎬' : '🎬 场次视图'}
             </button>
             <button
               onClick={() => setViewMode('list')}
               style={{
                 ...toggleBtnStyle,
-                background: viewMode === 'list' ? '#e74c3c' : 'transparent',
-                color: viewMode === 'list' ? '#fff' : '#888',
+                minHeight: isMobile ? 36 : 0,
+                padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : toggleBtnStyle.padding,
+                fontSize: isMobile ? fontSize.sm : toggleBtnStyle.fontSize,
+                background: viewMode === 'list' ? colors.primary : 'transparent',
+                color: viewMode === 'list' ? colors.textInverse : colors.textMuted,
+                borderRadius: isMobile ? radius.sm : toggleBtnStyle.borderRadius,
               }}
             >
-              📋 列表视图
+              {isMobile ? '📋' : '📋 列表视图'}
             </button>
           </div>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          gap: spacing.sm,
+          flexWrap: 'wrap',
+          alignItems: 'center',
+        }}>
           <input
             placeholder="搜索批注内容..."
             value={searchQuery}
@@ -1072,61 +1161,89 @@ export default function AnnotationsPage() {
               setSearchQuery(e.target.value);
               clearJumpParams();
             }}
-            style={{ ...inputStyle, width: 200 }}
+            style={{
+              ...inputStyle,
+              width: isMobile ? '100%' : 200,
+              minHeight: isMobile ? 40 : 0,
+              padding: isMobile ? `${spacing.md}px ${spacing.md}px` : inputStyle.padding,
+              fontSize: isMobile ? fontSize.md : inputStyle.fontSize,
+              borderRadius: radius.md,
+              flex: isMobile ? 1 : undefined,
+            }}
           />
           <button
-            onClick={() => setShowFilterPanel(!showFilterPanel)}
+            onClick={() => (isMobile ? setShowFilterPanel(true) : setShowFilterPanel(!showFilterPanel))}
             style={{
               ...secondaryBtnStyle,
-              ...(showFilterPanel ? { background: '#e74c3c', borderColor: '#e74c3c', color: '#fff' } : {}),
+              ...(showFilterPanel ? {
+                background: colors.primary,
+                borderColor: colors.primary,
+                color: colors.textInverse,
+              } : {}),
+              minHeight: isMobile ? 40 : 0,
+              padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : secondaryBtnStyle.padding,
+              fontSize: isMobile ? fontSize.sm : secondaryBtnStyle.fontSize,
+              borderRadius: radius.md,
               position: 'relative',
             }}
           >
-            🏷️ 标签
+            {isMobile ? '🏷️' : '🏷️ 标签'}
             {selectedTags.length > 0 && (
               <span style={{
                 position: 'absolute',
-                top: -6,
-                right: -6,
-                background: '#e74c3c',
-                color: '#fff',
-                fontSize: 10,
-                padding: '1px 5px',
+                top: isMobile ? 2 : -6,
+                right: isMobile ? 2 : -6,
+                background: colors.warning || colors.primary,
+                color: colors.textInverse,
+                fontSize: isMobile ? 9 : 10,
+                padding: isMobile ? '0 4px' : '1px 5px',
                 borderRadius: 8,
-                minWidth: 16,
+                minWidth: isMobile ? 14 : 16,
+                height: isMobile ? 14 : undefined,
                 textAlign: 'center',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
               }}>
                 {selectedTags.length}
               </span>
             )}
           </button>
-          <button onClick={goToSearchPage} style={secondaryBtnStyle} title="高级搜索">
-            🔍 高级
-          </button>
-          <button onClick={() => setShowForm(!showForm)} style={primaryBtnStyle}>
-            {showForm ? '取消' : '+ 新批注'}
+          <button
+            onClick={goToSearchPage}
+            style={{
+              ...secondaryBtnStyle,
+              minHeight: isMobile ? 40 : 0,
+              padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : secondaryBtnStyle.padding,
+              fontSize: isMobile ? fontSize.sm : secondaryBtnStyle.fontSize,
+              borderRadius: radius.md,
+            }}
+            title="高级搜索"
+          >
+            {isMobile ? '🔍' : '🔍 高级'}
           </button>
         </div>
       </div>
 
-      {showFilterPanel && tagsInUse.length > 0 && (
+      {showFilterPanel && !isMobile && tagsInUse.length > 0 && (
         <div style={{
-          background: '#1a1a1a',
-          border: '1px solid #333',
-          borderRadius: 8,
-          padding: 16,
-          marginBottom: 20,
+          background: colors.bgSecondary,
+          border: `1px solid ${colors.border}`,
+          borderRadius: radius.md,
+          padding: spacing.lg,
+          marginBottom: spacing.lg,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 13, color: '#aaa' }}>按标签筛选</span>
+            <span style={{ fontSize: 13, color: colors.textSecondary }}>按标签筛选</span>
             {selectedTags.length > 0 && (
               <button
                 onClick={clearFilterTags}
                 style={{
                   background: 'none',
-                  border: '1px solid #555',
-                  borderRadius: 4,
-                  color: '#888',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: radius.sm,
+                  color: colors.textMuted,
                   cursor: 'pointer',
                   fontSize: 12,
                   padding: '2px 10px',
@@ -1136,7 +1253,7 @@ export default function AnnotationsPage() {
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
             {tagsInUse.map((tagInfo) => {
               const isActive = selectedTags.includes(tagInfo.name);
               const color = tagInfo.color || getTagColor(tagInfo.name);
@@ -1145,13 +1262,14 @@ export default function AnnotationsPage() {
                   key={tagInfo.name}
                   onClick={() => toggleFilterTag(tagInfo.name)}
                   style={{
-                    padding: '4px 12px',
+                    padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '4px 12px',
                     background: isActive ? color : `${color}20`,
                     border: `1px solid ${isActive ? color : `${color}50`}`,
                     borderRadius: 14,
-                    color: isActive ? '#fff' : color,
+                    color: isActive ? colors.textInverse : color,
                     cursor: 'pointer',
-                    fontSize: 12,
+                    fontSize: isMobile ? fontSize.sm : 12,
+                    minHeight: isMobile ? 32 : 0,
                     transition: 'all 0.15s',
                     display: 'flex',
                     alignItems: 'center',
@@ -1175,9 +1293,9 @@ export default function AnnotationsPage() {
           </div>
 
           {systemTags.length > 0 && (
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #333' }}>
-              <div style={{ fontSize: 13, color: '#aaa', marginBottom: 8 }}>
-                🏷️ 统一标签 {selectedSystemTagIds.length > 0 && <span style={{ color: '#3498db' }}>(已选 {selectedSystemTagIds.length} 个)</span>}
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${colors.border}` }}>
+              <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 8 }}>
+                🏷️ 统一标签 {selectedSystemTagIds.length > 0 && <span style={{ color: colors.info }}>(已选 {selectedSystemTagIds.length} 个)</span>}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {systemTags.map((tag) => {
@@ -1201,13 +1319,14 @@ export default function AnnotationsPage() {
                         setSearchParams(params, { replace: true });
                       }}
                       style={{
-                        padding: '4px 12px',
+                        padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '4px 12px',
                         borderRadius: 14,
-                        border: `1px solid ${selected ? tag.color : '#444'}`,
+                        border: `1px solid ${selected ? tag.color : colors.border}`,
                         background: selected ? `${tag.color}20` : 'transparent',
-                        color: selected ? tag.color : '#aaa',
-                        fontSize: 12,
+                        color: selected ? tag.color : colors.textSecondary,
+                        fontSize: isMobile ? fontSize.sm : 12,
                         cursor: 'pointer',
+                        minHeight: isMobile ? 32 : 0,
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 6,
@@ -1233,13 +1352,14 @@ export default function AnnotationsPage() {
                       setSearchParams(params, { replace: true });
                     }}
                     style={{
-                      padding: '4px 10px',
+                      padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '4px 10px',
                       borderRadius: 14,
-                      border: '1px solid #555',
+                      border: `1px solid ${colors.border}`,
                       background: 'transparent',
-                      color: '#888',
-                      fontSize: 12,
+                      color: colors.textMuted,
+                      fontSize: isMobile ? fontSize.sm : 12,
                       cursor: 'pointer',
+                      minHeight: isMobile ? 32 : 0,
                     }}
                   >
                     清除
@@ -1251,21 +1371,184 @@ export default function AnnotationsPage() {
         </div>
       )}
 
-      {showForm && (
-        <form onSubmit={handleCreate} style={formStyle}>
-          <h4 style={{ margin: '0 0 8px 0', color: '#ccc' }}>新建批注</h4>
+      {isMobile && (
+        <BottomSheet
+          isOpen={showFilterPanel && tagsInUse.length > 0}
+          onClose={() => setShowFilterPanel(false)}
+          title="标签筛选"
+          rightAction={
+            <button
+              onClick={clearFilterTags}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.textMuted,
+                cursor: 'pointer',
+                fontSize: fontSize.sm,
+                padding: spacing.xs,
+              }}
+            >
+              清除
+            </button>
+          }
+        >
+          <div style={{ padding: `0 ${spacing.md}px ${spacing.xl}px`, display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
+            <div>
+              <span style={{ fontSize: fontSize.md, color: colors.textSecondary, fontWeight: 500 }}>自定义标签</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+                {tagsInUse.map((tagInfo) => {
+                  const isActive = selectedTags.includes(tagInfo.name);
+                  const color = tagInfo.color || getTagColor(tagInfo.name);
+                  return (
+                    <button
+                      key={tagInfo.name}
+                      onClick={() => toggleFilterTag(tagInfo.name)}
+                      style={{
+                        padding: `${spacing.sm}px ${spacing.md}px`,
+                        background: isActive ? color : `${color}20`,
+                        border: `1px solid ${isActive ? color : `${color}50`}`,
+                        borderRadius: 14,
+                        color: isActive ? colors.textInverse : color,
+                        cursor: 'pointer',
+                        fontSize: fontSize.sm,
+                        minHeight: 36,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
+                      {tagInfo.name}
+                      {isActive && ' ✕'}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {systemTags.length > 0 && (
+              <div>
+                <span style={{ fontSize: fontSize.md, color: colors.textSecondary, fontWeight: 500 }}>
+                  🏷️ 统一标签 {selectedSystemTagIds.length > 0 && <span style={{ color: colors.info }}>(已选 {selectedSystemTagIds.length})</span>}
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: spacing.md }}>
+                  {systemTags.map((tag) => {
+                    const selected = selectedSystemTagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        onClick={() => {
+                          setSelectedSystemTagIds((prev) =>
+                            selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]
+                          );
+                          const params = new URLSearchParams(searchParams);
+                          const newIds = selected
+                            ? selectedSystemTagIds.filter((id) => id !== tag.id)
+                            : [...selectedSystemTagIds, tag.id];
+                          if (newIds.length > 0) {
+                            params.set('tagIds', newIds.join(','));
+                          } else {
+                            params.delete('tagIds');
+                          }
+                          setSearchParams(params, { replace: true });
+                        }}
+                        style={{
+                          padding: `${spacing.sm}px ${spacing.md}px`,
+                          borderRadius: 14,
+                          border: `1px solid ${selected ? tag.color : colors.border}`,
+                          background: selected ? `${tag.color}20` : 'transparent',
+                          color: selected ? tag.color : colors.textSecondary,
+                          fontSize: fontSize.sm,
+                          cursor: 'pointer',
+                          minHeight: 36,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: tag.color }} />
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                  {selectedSystemTagIds.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setSelectedSystemTagIds([]);
+                        const params = new URLSearchParams(searchParams);
+                        params.delete('tagIds');
+                        setSearchParams(params, { replace: true });
+                      }}
+                      style={{
+                        padding: `${spacing.sm}px ${spacing.md}px`,
+                        borderRadius: 14,
+                        border: `1px solid ${colors.border}`,
+                        background: 'transparent',
+                        color: colors.textMuted,
+                        fontSize: fontSize.sm,
+                        cursor: 'pointer',
+                        minHeight: 36,
+                      }}
+                    >
+                      清除
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowFilterPanel(false)}
+              style={{
+                padding: `${spacing.md}px ${spacing.lg}px`,
+                background: colors.primary,
+                border: 'none',
+                borderRadius: radius.md,
+                color: colors.textInverse,
+                cursor: 'pointer',
+                fontSize: fontSize.md,
+                fontWeight: 600,
+                minHeight: 48,
+              }}
+            >
+              完成筛选
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {showForm && !isMobile && (
+        <form onSubmit={handleCreate} style={{
+          ...formStyle,
+          background: colors.bgSecondary,
+          border: `1px solid ${colors.border}`,
+          borderRadius: radius.md,
+        }}>
+          <h4 style={{ margin: '0 0 8px 0', color: colors.textSecondary }}>新建批注</h4>
           <textarea
             placeholder="剧本原文"
             value={form.scriptContent}
             onChange={(e) => setForm({ ...form, scriptContent: e.target.value })}
             required
-            style={{ ...inputStyle, minHeight: 80 }}
+            style={{
+              ...inputStyle,
+              minHeight: 80,
+              padding: spacing.md,
+              fontSize: fontSize.md,
+              borderRadius: radius.md,
+            }}
           />
           <textarea
             placeholder="批注笔记"
             value={form.note}
             onChange={(e) => setForm({ ...form, note: e.target.value })}
-            style={{ ...inputStyle, minHeight: 60 }}
+            style={{
+              ...inputStyle,
+              minHeight: 60,
+              padding: spacing.md,
+              fontSize: fontSize.md,
+              borderRadius: radius.md,
+            }}
           />
           {renderTagSelector()}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1274,14 +1557,26 @@ export default function AnnotationsPage() {
               type="number"
               value={form.sceneNumber}
               onChange={(e) => setForm({ ...form, sceneNumber: e.target.value })}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                minHeight: 44,
+                padding: spacing.md,
+                fontSize: fontSize.md,
+                borderRadius: radius.md,
+              }}
             />
             <input
               placeholder="起始偏移"
               type="number"
               value={form.startOffset}
               onChange={(e) => setForm({ ...form, startOffset: e.target.value })}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                minHeight: 44,
+                padding: spacing.md,
+                fontSize: fontSize.md,
+                borderRadius: radius.md,
+              }}
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1290,14 +1585,20 @@ export default function AnnotationsPage() {
               type="number"
               value={form.endOffset}
               onChange={(e) => setForm({ ...form, endOffset: e.target.value })}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                minHeight: 44,
+                padding: spacing.md,
+                fontSize: fontSize.md,
+                borderRadius: radius.md,
+              }}
             />
             <div />
           </div>
           <div>
-            <div style={{ color: '#888', fontSize: 13, marginBottom: 6 }}>📁 关联素材（可选）</div>
+            <div style={{ color: colors.textMuted, fontSize: 13, marginBottom: 6 }}>📁 关联素材（可选）</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {materials.length === 0 && <span style={{ color: '#555', fontSize: 12 }}>暂无素材</span>}
+              {materials.length === 0 && <span style={{ color: colors.textDim, fontSize: 12 }}>暂无素材</span>}
               {materials.map((m) => (
                 <label
                   key={m.id}
@@ -1305,13 +1606,14 @@ export default function AnnotationsPage() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    padding: '4px 10px',
-                    background: form.materialIds.includes(m.id) ? 'rgba(52, 152, 219, 0.2)' : '#222',
-                    border: `1px solid ${form.materialIds.includes(m.id) ? '#3498db' : '#444'}`,
+                    padding: `${spacing.sm}px ${spacing.md}px`,
+                    background: form.materialIds.includes(m.id) ? `${colors.info}20` : colors.bgTertiary,
+                    border: `1px solid ${form.materialIds.includes(m.id) ? colors.info : colors.border}`,
                     borderRadius: 16,
                     cursor: 'pointer',
                     fontSize: 12,
-                    color: '#e0e0e0',
+                    color: colors.text,
+                    minHeight: 36,
                     maxWidth: 240,
                   }}
                   title={m.originalName}
@@ -1320,7 +1622,7 @@ export default function AnnotationsPage() {
                     type="checkbox"
                     checked={form.materialIds.includes(m.id)}
                     onChange={() => toggleMaterial(m.id)}
-                    style={{ accentColor: '#3498db' }}
+                    style={{ accentColor: colors.info }}
                   />
                   <span style={{
                     whiteSpace: 'nowrap',
@@ -1335,11 +1637,221 @@ export default function AnnotationsPage() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <button type="submit" style={primaryBtnStyle}>
+            <button
+              type="submit"
+              style={{
+                ...primaryBtnStyle,
+                minHeight: 44,
+                padding: `${spacing.md}px ${spacing.lg}px`,
+                borderRadius: radius.md,
+              }}
+            >
               创建
             </button>
           </div>
         </form>
+      )}
+
+      {isMobile && (
+        <BottomSheet
+          isOpen={showForm}
+          onClose={() => setShowForm(false)}
+          title={editingId ? '编辑批注' : '新建批注'}
+          rightAction={
+            <button
+              onClick={() => setShowForm(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.textMuted,
+                cursor: 'pointer',
+                fontSize: fontSize.lg,
+                padding: spacing.xs,
+              }}
+            >
+              ✕
+            </button>
+          }
+        >
+          <form onSubmit={handleCreate} style={{
+            padding: `0 ${spacing.md}px ${spacing.xl}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: spacing.lg,
+          }}>
+            <div>
+              <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: 500, marginBottom: spacing.sm, display: 'block' }}>
+                剧本原文 *
+              </label>
+              <textarea
+                placeholder="输入剧本原文内容..."
+                value={form.scriptContent}
+                onChange={(e) => setForm({ ...form, scriptContent: e.target.value })}
+                required
+                style={{
+                  ...inputStyle,
+                  width: '100%',
+                  minHeight: 120,
+                  padding: `${spacing.md}px ${spacing.md}px`,
+                  fontSize: fontSize.md,
+                  borderRadius: radius.md,
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: 500, marginBottom: spacing.sm, display: 'block' }}>
+                批注笔记
+              </label>
+              <textarea
+                placeholder="添加批注笔记..."
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                style={{
+                  ...inputStyle,
+                  width: '100%',
+                  minHeight: 80,
+                  padding: `${spacing.md}px ${spacing.md}px`,
+                  fontSize: fontSize.md,
+                  borderRadius: radius.md,
+                }}
+              />
+            </div>
+            <div>{renderTagSelector()}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.md }}>
+              <div>
+                <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: 500, marginBottom: spacing.sm, display: 'block' }}>场次</label>
+                <input
+                  placeholder="场次号"
+                  type="number"
+                  value={form.sceneNumber}
+                  onChange={(e) => setForm({ ...form, sceneNumber: e.target.value })}
+                  style={{
+                    ...inputStyle,
+                    width: '100%',
+                    minHeight: 48,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                    borderRadius: radius.md,
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: 500, marginBottom: spacing.sm, display: 'block' }}>起始偏移</label>
+                <input
+                  placeholder="可选"
+                  type="number"
+                  value={form.startOffset}
+                  onChange={(e) => setForm({ ...form, startOffset: e.target.value })}
+                  style={{
+                    ...inputStyle,
+                    width: '100%',
+                    minHeight: 48,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                    borderRadius: radius.md,
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: 500, marginBottom: spacing.sm, display: 'block' }}>结束偏移</label>
+              <input
+                placeholder="可选"
+                type="number"
+                value={form.endOffset}
+                onChange={(e) => setForm({ ...form, endOffset: e.target.value })}
+                style={{
+                  ...inputStyle,
+                  width: '100%',
+                  minHeight: 48,
+                  padding: `${spacing.md}px ${spacing.md}px`,
+                  fontSize: fontSize.md,
+                  borderRadius: radius.md,
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: 500, marginBottom: spacing.sm, display: 'block' }}>📁 关联素材（可选）</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
+                {materials.length === 0 && (
+                  <span style={{ color: colors.textDim, fontSize: fontSize.sm }}>暂无素材</span>
+                )}
+                {materials.map((m) => (
+                  <label
+                    key={m.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: `${spacing.sm}px ${spacing.md}px`,
+                      background: form.materialIds.includes(m.id) ? `${colors.info}20` : colors.bgTertiary,
+                      border: `1px solid ${form.materialIds.includes(m.id) ? colors.info : colors.border}`,
+                      borderRadius: 16,
+                      cursor: 'pointer',
+                      fontSize: fontSize.sm,
+                      color: colors.text,
+                      minHeight: 40,
+                      maxWidth: '100%',
+                    }}
+                    title={m.originalName}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.materialIds.includes(m.id)}
+                      onChange={() => toggleMaterial(m.id)}
+                      style={{ accentColor: colors.info }}
+                    />
+                    <span style={{
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: 200,
+                    }}>
+                      {m.originalName}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: spacing.md }}>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  padding: `${spacing.md}px ${spacing.lg}px`,
+                  background: colors.bgTertiary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: radius.md,
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  fontWeight: 500,
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                style={{
+                  flex: 1.5,
+                  minHeight: 48,
+                  padding: `${spacing.md}px ${spacing.lg}px`,
+                  background: colors.primary,
+                  border: 'none',
+                  borderRadius: radius.md,
+                  color: colors.textInverse,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  fontWeight: 600,
+                }}
+              >
+                {editingId ? '保存修改' : '创建批注'}
+              </button>
+            </div>
+          </form>
+        </BottomSheet>
       )}
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -1428,11 +1940,39 @@ export default function AnnotationsPage() {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           {!groupedData ? (
-            <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>加载中...</div>
+            <div style={{
+              textAlign: 'center',
+              color: colors.textDim,
+              padding: isMobile ? `${spacing.xl}px ${spacing.md}px` : 48,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: spacing.md,
+            }}>
+              <span className="animate-pulse" style={{ fontSize: 32 }}>⏳</span>
+              <span style={{ fontSize: isMobile ? fontSize.md : 16 }}>加载中...</span>
+            </div>
           ) : viewMode === 'grouped' ? (
             filteredVisibleGroups.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>
-                {searchQuery || selectedTags.length > 0 ? '未找到匹配的批注' : '暂无批注'}
+              <div style={{ marginTop: isMobile ? spacing.xl : 0 }}>
+                <EmptyState
+                  icon={searchQuery || selectedTags.length > 0 ? '🔍' : '📝'}
+                  title={searchQuery || selectedTags.length > 0 ? '未找到匹配的批注' : '暂无批注'}
+                  description={searchQuery || selectedTags.length > 0 ? '尝试调整搜索关键词或筛选条件' : canEdit ? '点击右上角按钮创建第一个批注' : '等待管理员创建批注内容'}
+                  primaryAction={
+                    canEdit
+                      ? {
+                          label: searchQuery || selectedTags.length > 0 ? '清除筛选' : '创建批注',
+                          onClick: searchQuery || selectedTags.length > 0
+                            ? () => {
+                                setSearchQuery('');
+                                clearFilterTags();
+                              }
+                            : () => setShowForm(true),
+                        }
+                      : undefined
+                  }
+                />
               </div>
             ) : (
               filteredVisibleGroups.map((g) => {
@@ -1501,10 +2041,27 @@ export default function AnnotationsPage() {
               })
             )
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? spacing.md : 12 }}>
               {allAnnotationsFlat.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>
-                  {searchQuery || selectedTags.length > 0 ? '未找到匹配的批注' : '暂无批注'}
+                <div style={{ marginTop: isMobile ? spacing.xl : 0 }}>
+                  <EmptyState
+                    icon={searchQuery || selectedTags.length > 0 ? '🔍' : '📝'}
+                    title={searchQuery || selectedTags.length > 0 ? '未找到匹配的批注' : '暂无批注'}
+                    description={searchQuery || selectedTags.length > 0 ? '尝试调整搜索关键词或筛选条件' : canEdit ? '点击右上角按钮创建第一个批注' : '等待管理员创建批注内容'}
+                    primaryAction={
+                      canEdit
+                        ? {
+                            label: searchQuery || selectedTags.length > 0 ? '清除筛选' : '创建批注',
+                            onClick: searchQuery || selectedTags.length > 0
+                              ? () => {
+                                  setSearchQuery('');
+                                  clearFilterTags();
+                                }
+                              : () => setShowForm(true),
+                          }
+                        : undefined
+                    }
+                  />
                 </div>
               ) : (
                 allAnnotationsFlat.map(renderAnnotationCard)

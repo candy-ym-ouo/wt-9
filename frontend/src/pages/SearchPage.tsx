@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { useResponsive } from '../hooks/useResponsive';
+import BottomSheet from '../components/BottomSheet';
+import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import { colors, spacing, fontSize, radius } from '../styles/theme';
 
 interface TagInfo {
   name: string;
@@ -83,6 +88,7 @@ function highlightSearchResult(
 
 export default function SearchPage() {
   const navigate = useNavigate();
+  const { isMobile, isTablet } = useResponsive();
   const [searchParams, setSearchParams] = useSearchParams();
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -276,82 +282,150 @@ export default function SearchPage() {
     (e.currentTarget as HTMLDivElement).style.background = '#1a1a1a';
   };
 
-  return (
-    <div>
-      <h2 style={{ margin: '0 0 24px', color: '#e0e0e0' }}>全站检索</h2>
-
-      <form onSubmit={handleSearch} style={{
+  const searchHeaderActions = (
+    <button
+      type="button"
+      onClick={() => (isMobile ? setShowFilters(true) : setShowFilters(!showFilters))}
+      style={{
+        padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '12px 16px',
+        background: showFilters ? colors.primary : colors.bgTertiary,
+        border: `1px solid ${showFilters ? colors.primary : colors.border}`,
+        borderRadius: radius.md,
+        color: colors.textInverse,
+        cursor: 'pointer',
+        fontSize: isMobile ? fontSize.sm : 15,
         display: 'flex',
-        gap: 8,
-        marginBottom: 16,
-      }}>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜索排练、角色、批注、素材..."
+        alignItems: 'center',
+        gap: spacing.xs,
+        minHeight: isMobile ? 40 : 0,
+        minWidth: isMobile ? 40 : 0,
+        position: 'relative',
+      }}
+      title="高级筛选"
+    >
+      {isMobile ? '⚙️' : '⚙️ 筛选'}
+      {hasActiveFilters && (
+        <span
           style={{
-            flex: 1,
-            padding: '12px 16px',
-            background: '#1a1a1a',
-            border: '1px solid #333',
-            borderRadius: 8,
-            color: '#e0e0e0',
-            fontSize: 16,
-            outline: 'none',
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => setShowFilters(!showFilters)}
-          style={{
-            padding: '12px 16px',
-            background: showFilters ? '#e74c3c' : '#2a2a2a',
-            border: '1px solid #333',
-            borderRadius: 8,
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: 15,
-            display: 'flex',
+            position: isMobile ? 'absolute' : 'relative',
+            top: isMobile ? 4 : 'auto',
+            right: isMobile ? 4 : 'auto',
+            marginLeft: isMobile ? 0 : 6,
+            width: isMobile ? 8 : undefined,
+            height: isMobile ? 8 : undefined,
+            borderRadius: '50%',
+            background: colors.warning,
+            display: isMobile ? 'inline-block' : 'inline-flex',
             alignItems: 'center',
-            gap: 6,
+            justifyContent: 'center',
+            color: isMobile ? 'transparent' : colors.textInverse,
+            fontSize: isMobile ? 0 : 11,
+            minWidth: isMobile ? 0 : 18,
+            padding: isMobile ? 0 : '2px 6px',
           }}
         >
-          ⚙️ 筛选
-          {hasActiveFilters && (
-            <span style={{
-              background: '#e74c3c',
-              color: '#fff',
-              fontSize: 11,
-              padding: '2px 6px',
-              borderRadius: 10,
-              minWidth: 18,
-              textAlign: 'center',
-            }}>
-              !
+          {!isMobile && '!'}
+        </span>
+      )}
+    </button>
+  );
+
+  return (
+    <div>
+      <PageHeader
+        title="全站检索"
+        subtitle={results ? `共找到 ${results.total} 条结果` : undefined}
+        rightAction={searchHeaderActions}
+        sticky
+      />
+
+      {!isMobile && (
+        <h2 style={{ margin: '0 0 24px', color: colors.text }}>
+          全站检索
+        </h2>
+      )}
+
+      <form
+        onSubmit={handleSearch}
+        style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? spacing.md : 8,
+          marginBottom: isMobile ? spacing.lg : 16,
+        }}
+      >
+        <div style={{ display: 'flex', flex: 1, gap: spacing.sm }}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索排练、角色、批注、素材..."
+            style={{
+              flex: 1,
+              padding: isMobile
+                ? `${spacing.md + 2}px ${spacing.md + 2}px`
+                : '12px 16px',
+              background: colors.bgSecondary,
+              border: `1px solid ${colors.border}`,
+              borderRadius: radius.md,
+              color: colors.text,
+              fontSize: isMobile ? fontSize.lg : 16,
+              outline: 'none',
+              transition: 'all 0.15s',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = colors.primary;
+              e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.primary}20`;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = colors.border;
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          />
+          {!isMobile && searchHeaderActions}
+        </div>
+        {isMobile && searchHeaderActions}
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: isMobile
+              ? `${spacing.md + 2}px ${spacing.lg}px`
+              : '12px 24px',
+            background: colors.primary,
+            border: 'none',
+            borderRadius: radius.md,
+            color: colors.textInverse,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            fontSize: isMobile ? fontSize.md : 15,
+            fontWeight: 600,
+            opacity: loading ? 0.7 : 1,
+            minHeight: isMobile ? 50 : 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: spacing.sm,
+          }}
+        >
+          {loading ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: spacing.sm }}>
+              <span className="animate-pulse">⏳</span>
+              搜索中
             </span>
+          ) : isMobile ? (
+            '🔍'
+          ) : (
+            '🔍 搜索'
           )}
-        </button>
-        <button type="submit" disabled={loading} style={{
-          padding: '12px 24px',
-          background: '#e74c3c',
-          border: 'none',
-          borderRadius: 8,
-          color: '#fff',
-          cursor: 'pointer',
-          fontSize: 15,
-          fontWeight: 600,
-        }}>
-          {loading ? '搜索中...' : '🔍 搜索'}
         </button>
       </form>
 
-      {showFilters && (
+      {showFilters && !isMobile && (
         <div style={{
-          background: '#1a1a1a',
-          border: '1px solid #333',
-          borderRadius: 8,
-          padding: 20,
-          marginBottom: 24,
+          background: colors.bgSecondary,
+          border: `1px solid ${colors.border}`,
+          borderRadius: radius.md,
+          padding: isMobile ? spacing.lg : 20,
+          marginBottom: isMobile ? spacing.lg : 24,
         }}>
           <div style={{
             display: 'flex',
@@ -359,39 +433,42 @@ export default function SearchPage() {
             alignItems: 'center',
             marginBottom: 16,
           }}>
-            <h3 style={{ margin: 0, color: '#e0e0e0', fontSize: 15 }}>高级筛选</h3>
+            <h3 style={{ margin: 0, color: colors.text, fontSize: isMobile ? fontSize.md : 15 }}>高级筛选</h3>
             <button
               onClick={clearFilters}
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#888',
+                color: colors.textMuted,
                 cursor: 'pointer',
-                fontSize: 13,
+                fontSize: isMobile ? fontSize.sm : 13,
               }}
             >
               重置筛选
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20 }}>
             <div>
               <label style={filterLabelStyle}>模块类型</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
                 {MODULE_OPTIONS.map((mod) => (
                   <label
                     key={mod.key}
                     style={{
                       ...moduleTagStyle,
+                      padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : moduleTagStyle.padding,
+                      fontSize: isMobile ? fontSize.sm : moduleTagStyle.fontSize,
                       background: selectedModules.includes(mod.key)
                         ? mod.color + '20'
-                        : '#2a2a2a',
+                        : colors.bgTertiary,
                       borderColor: selectedModules.includes(mod.key)
                         ? mod.color
-                        : '#333',
+                        : colors.border,
                       color: selectedModules.includes(mod.key)
                         ? mod.color
-                        : '#888',
+                        : colors.textMuted,
+                      minHeight: isMobile ? 40 : 0,
                     }}
                   >
                     <input
@@ -408,11 +485,16 @@ export default function SearchPage() {
 
             <div>
               <label style={filterLabelStyle}>排序方式</label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: spacing.sm, alignItems: isMobile ? 'stretch' : 'center' }}>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  style={selectStyle}
+                  style={{
+                    ...selectStyle,
+                    minHeight: isMobile ? 44 : undefined,
+                    padding: isMobile ? `${spacing.md}px ${spacing.md}px` : undefined,
+                    fontSize: isMobile ? fontSize.md : undefined,
+                  }}
                 >
                   {SORT_OPTIONS.map((opt) => (
                     <option key={opt.key} value={opt.key}>{opt.label}</option>
@@ -421,7 +503,12 @@ export default function SearchPage() {
                 <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
-                  style={selectStyle}
+                  style={{
+                    ...selectStyle,
+                    minHeight: isMobile ? 44 : undefined,
+                    padding: isMobile ? `${spacing.md}px ${spacing.md}px` : undefined,
+                    fontSize: isMobile ? fontSize.md : undefined,
+                  }}
                 >
                   <option value="desc">降序</option>
                   <option value="asc">升序</option>
@@ -431,37 +518,53 @@ export default function SearchPage() {
 
             <div>
               <label style={filterLabelStyle}>时间范围</label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'center', marginBottom: spacing.sm }}>
                 <select
                   value={dateField}
                   onChange={(e) => setDateField(e.target.value)}
-                  style={{ ...selectStyle, flex: 1 }}
+                  style={{
+                    ...selectStyle,
+                    flex: 1,
+                    minHeight: isMobile ? 44 : undefined,
+                    padding: isMobile ? `${spacing.md}px ${spacing.md}px` : undefined,
+                    fontSize: isMobile ? fontSize.md : undefined,
+                  }}
                 >
                   {DATE_FIELD_OPTIONS.map((opt) => (
                     <option key={opt.key} value={opt.key}>{opt.label}</option>
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: spacing.sm, alignItems: isMobile ? 'stretch' : 'center' }}>
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  style={dateInputStyle}
+                  style={{
+                    ...dateInputStyle,
+                    minHeight: isMobile ? 44 : undefined,
+                    padding: isMobile ? `${spacing.md}px ${spacing.md}px` : undefined,
+                    fontSize: isMobile ? fontSize.md : undefined,
+                  }}
                 />
-                <span style={{ color: '#666' }}>至</span>
+                <span style={{ color: colors.textDim, textAlign: 'center' }}>至</span>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  style={dateInputStyle}
+                  style={{
+                    ...dateInputStyle,
+                    minHeight: isMobile ? 44 : undefined,
+                    padding: isMobile ? `${spacing.md}px ${spacing.md}px` : undefined,
+                    fontSize: isMobile ? fontSize.md : undefined,
+                  }}
                 />
               </div>
             </div>
 
             <div>
               <label style={filterLabelStyle}>结果展示方式</label>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: spacing.sm }}>
                 <button
                   onClick={() => {
                     setGroupByModule(true);
@@ -469,8 +572,11 @@ export default function SearchPage() {
                   }}
                   style={{
                     ...viewModeBtnStyle,
-                    background: viewMode === 'grouped' ? '#e74c3c' : '#2a2a2a',
-                    borderColor: viewMode === 'grouped' ? '#e74c3c' : '#333',
+                    minHeight: isMobile ? 44 : undefined,
+                    padding: isMobile ? `${spacing.md}px ${spacing.md}px` : undefined,
+                    fontSize: isMobile ? fontSize.md : undefined,
+                    background: viewMode === 'grouped' ? colors.primary : colors.bgTertiary,
+                    borderColor: viewMode === 'grouped' ? colors.primary : colors.border,
                   }}
                 >
                   按模块分组
@@ -482,8 +588,11 @@ export default function SearchPage() {
                   }}
                   style={{
                     ...viewModeBtnStyle,
-                    background: viewMode === 'list' ? '#e74c3c' : '#2a2a2a',
-                    borderColor: viewMode === 'list' ? '#e74c3c' : '#333',
+                    minHeight: isMobile ? 44 : undefined,
+                    padding: isMobile ? `${spacing.md}px ${spacing.md}px` : undefined,
+                    fontSize: isMobile ? fontSize.md : undefined,
+                    background: viewMode === 'list' ? colors.primary : colors.bgTertiary,
+                    borderColor: viewMode === 'list' ? colors.primary : colors.border,
                   }}
                 >
                   列表视图
@@ -494,7 +603,7 @@ export default function SearchPage() {
             {allTags.length > 0 && (
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={filterLabelStyle}>标签筛选</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs }}>
                   {allTags.map((tagInfo) => {
                     const tagColor = tagInfo.color || getTagColor(tagInfo.name);
                     const isSelected = selectedTags.includes(tagInfo.name);
@@ -503,9 +612,12 @@ export default function SearchPage() {
                         key={tagInfo.name}
                         style={{
                           ...tagStyle,
-                          background: isSelected ? `${tagColor}30` : '#2a2a2a',
-                          borderColor: isSelected ? tagColor : '#333',
-                          color: isSelected ? tagColor : '#aaa',
+                          minHeight: isMobile ? 36 : 0,
+                          padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : tagStyle.padding,
+                          fontSize: isMobile ? fontSize.sm : tagStyle.fontSize,
+                          background: isSelected ? `${tagColor}30` : colors.bgTertiary,
+                          borderColor: isSelected ? tagColor : colors.border,
+                          color: isSelected ? tagColor : colors.textSecondary,
                           display: 'flex',
                           alignItems: 'center',
                           gap: 4,
@@ -536,21 +648,22 @@ export default function SearchPage() {
           <div style={{
             display: 'flex',
             justifyContent: 'flex-end',
-            gap: 8,
+            gap: spacing.sm,
             marginTop: 20,
             paddingTop: 16,
-            borderTop: '1px solid #333',
+            borderTop: `1px solid ${colors.border}`,
           }}>
             <button
               onClick={() => setShowFilters(false)}
               style={{
-                padding: '8px 20px',
-                background: '#2a2a2a',
-                border: '1px solid #333',
-                borderRadius: 6,
-                color: '#aaa',
+                padding: isMobile ? `${spacing.md}px ${spacing.lg}px` : '8px 20px',
+                background: colors.bgTertiary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: radius.md,
+                color: colors.textSecondary,
                 cursor: 'pointer',
-                fontSize: 14,
+                fontSize: isMobile ? fontSize.md : 14,
+                minHeight: isMobile ? 44 : 0,
               }}
             >
               取消
@@ -561,14 +674,15 @@ export default function SearchPage() {
                 setShowFilters(false);
               }}
               style={{
-                padding: '8px 20px',
-                background: '#e74c3c',
+                padding: isMobile ? `${spacing.md}px ${spacing.lg}px` : '8px 20px',
+                background: colors.primary,
                 border: 'none',
-                borderRadius: 6,
-                color: '#fff',
+                borderRadius: radius.md,
+                color: colors.textInverse,
                 cursor: 'pointer',
-                fontSize: 14,
+                fontSize: isMobile ? fontSize.md : 14,
                 fontWeight: 600,
+                minHeight: isMobile ? 44 : 0,
               }}
             >
               应用筛选
@@ -577,18 +691,291 @@ export default function SearchPage() {
         </div>
       )}
 
+      {isMobile && (
+        <BottomSheet
+          isOpen={showFilters}
+          onClose={() => setShowFilters(false)}
+          title="高级筛选"
+          rightAction={
+            <button
+              onClick={clearFilters}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.textMuted,
+                cursor: 'pointer',
+                fontSize: fontSize.sm,
+                padding: spacing.xs,
+              }}
+            >
+              重置
+            </button>
+          }
+        >
+          <div style={{ padding: `0 ${spacing.md}px ${spacing.xl}px`, display: 'flex', flexDirection: 'column', gap: spacing.xl }}>
+            <div>
+              <label style={filterLabelStyle}>模块类型</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm }}>
+                {MODULE_OPTIONS.map((mod) => (
+                  <label
+                    key={mod.key}
+                    style={{
+                      ...moduleTagStyle,
+                      padding: `${spacing.sm}px ${spacing.md}px`,
+                      fontSize: fontSize.sm,
+                      minHeight: 40,
+                      background: selectedModules.includes(mod.key)
+                        ? mod.color + '20'
+                        : colors.bgTertiary,
+                      borderColor: selectedModules.includes(mod.key)
+                        ? mod.color
+                        : colors.border,
+                      color: selectedModules.includes(mod.key)
+                        ? mod.color
+                        : colors.textMuted,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedModules.includes(mod.key)}
+                      onChange={() => toggleModule(mod.key)}
+                      style={{ display: 'none' }}
+                    />
+                    <span>{mod.icon} {mod.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label style={filterLabelStyle}>排序方式</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, marginTop: spacing.sm }}>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  style={{
+                    ...selectStyle,
+                    minHeight: 44,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                  }}
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={opt.key}>{opt.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  style={{
+                    ...selectStyle,
+                    minHeight: 44,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                  }}
+                >
+                  <option value="desc">降序</option>
+                  <option value="asc">升序</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={filterLabelStyle}>时间范围</label>
+              <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.sm }}>
+                <select
+                  value={dateField}
+                  onChange={(e) => setDateField(e.target.value)}
+                  style={{
+                    ...selectStyle,
+                    flex: 1,
+                    minHeight: 44,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                  }}
+                >
+                  {DATE_FIELD_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={opt.key}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  style={{
+                    ...dateInputStyle,
+                    minHeight: 44,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                  }}
+                />
+                <span style={{ color: colors.textDim, textAlign: 'center' }}>至</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  style={{
+                    ...dateInputStyle,
+                    minHeight: 44,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={filterLabelStyle}>结果展示方式</label>
+              <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.sm }}>
+                <button
+                  onClick={() => {
+                    setGroupByModule(true);
+                    setViewMode('grouped');
+                  }}
+                  style={{
+                    ...viewModeBtnStyle,
+                    flex: 1,
+                    minHeight: 44,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                    background: viewMode === 'grouped' ? colors.primary : colors.bgTertiary,
+                    borderColor: viewMode === 'grouped' ? colors.primary : colors.border,
+                  }}
+                >
+                  按模块分组
+                </button>
+                <button
+                  onClick={() => {
+                    setGroupByModule(false);
+                    setViewMode('list');
+                  }}
+                  style={{
+                    ...viewModeBtnStyle,
+                    flex: 1,
+                    minHeight: 44,
+                    padding: `${spacing.md}px ${spacing.md}px`,
+                    fontSize: fontSize.md,
+                    background: viewMode === 'list' ? colors.primary : colors.bgTertiary,
+                    borderColor: viewMode === 'list' ? colors.primary : colors.border,
+                  }}
+                >
+                  列表视图
+                </button>
+              </div>
+            </div>
+
+            {allTags.length > 0 && (
+              <div>
+                <label style={filterLabelStyle}>标签筛选</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm }}>
+                  {allTags.map((tagInfo) => {
+                    const tagColor = tagInfo.color || getTagColor(tagInfo.name);
+                    const isSelected = selectedTags.includes(tagInfo.name);
+                    return (
+                      <label
+                        key={tagInfo.name}
+                        style={{
+                          ...tagStyle,
+                          minHeight: 36,
+                          padding: `${spacing.sm}px ${spacing.md}px`,
+                          fontSize: fontSize.sm,
+                          background: isSelected ? `${tagColor}30` : colors.bgTertiary,
+                          borderColor: isSelected ? tagColor : colors.border,
+                          color: isSelected ? tagColor : colors.textSecondary,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleTag(tagInfo.name)}
+                          style={{ display: 'none' }}
+                        />
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: tagColor }} />
+                        {tagInfo.name}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: spacing.sm, paddingTop: spacing.md, borderTop: `1px solid ${colors.border}` }}>
+              <button
+                onClick={() => setShowFilters(false)}
+                style={{
+                  flex: 1,
+                  padding: `${spacing.md}px ${spacing.lg}px`,
+                  background: colors.bgTertiary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: radius.md,
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  minHeight: 48,
+                  fontWeight: 500,
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  doSearch();
+                  setShowFilters(false);
+                }}
+                style={{
+                  flex: 1.5,
+                  padding: `${spacing.md}px ${spacing.lg}px`,
+                  background: colors.primary,
+                  border: 'none',
+                  borderRadius: radius.md,
+                  color: colors.textInverse,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  fontWeight: 600,
+                  minHeight: 48,
+                }}
+              >
+                应用筛选
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
       {results && (
         <div>
           <div style={{
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 20,
+            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isMobile ? spacing.md : undefined,
+            marginBottom: isMobile ? spacing.lg : 20,
           }}>
-            <div style={{ fontSize: 14, color: '#888' }}>
-              共找到 <strong style={{ color: '#e74c3c' }}>{results.total}</strong> 条结果
+            <div style={{
+              fontSize: isMobile ? fontSize.md : 14,
+              color: colors.textMuted,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.xs,
+            }}>
+              共找到{' '}
+              <strong style={{
+                color: colors.primary,
+                fontSize: isMobile ? fontSize.lg : undefined,
+                fontWeight: 700,
+              }}>
+                {results.total}
+              </strong>{' '}
+              条结果
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{
+              display: 'flex',
+              gap: spacing.sm,
+              alignSelf: isMobile ? 'flex-end' : undefined,
+            }}>
               <button
                 onClick={() => {
                   setGroupByModule(true);
@@ -596,10 +983,14 @@ export default function SearchPage() {
                 }}
                 style={{
                   ...smallBtnStyle,
-                  background: viewMode === 'grouped' ? '#e74c3c' : '#2a2a2a',
+                  minHeight: isMobile ? 36 : 0,
+                  padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : undefined,
+                  fontSize: isMobile ? fontSize.sm : undefined,
+                  background: viewMode === 'grouped' ? colors.primary : colors.bgTertiary,
+                  borderRadius: radius.md,
                 }}
               >
-                分组
+                📂 分组
               </button>
               <button
                 onClick={() => {
@@ -608,10 +999,14 @@ export default function SearchPage() {
                 }}
                 style={{
                   ...smallBtnStyle,
-                  background: viewMode === 'list' ? '#e74c3c' : '#2a2a2a',
+                  minHeight: isMobile ? 36 : 0,
+                  padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : undefined,
+                  fontSize: isMobile ? fontSize.sm : undefined,
+                  background: viewMode === 'list' ? colors.primary : colors.bgTertiary,
+                  borderRadius: radius.md,
                 }}
               >
-                列表
+                📋 列表
               </button>
             </div>
           </div>
@@ -1052,7 +1447,24 @@ export default function SearchPage() {
           )}
 
           {results.total === 0 && (
-            <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>未找到相关结果</div>
+            <div style={{ marginTop: isMobile ? spacing.xl : 32 }}>
+              <EmptyState
+                icon="🔍"
+                title="未找到相关结果"
+                description={query ? `没有匹配"${query}"的内容` : '请输入关键词搜索'}
+                primaryAction={{
+                  label: '清空搜索词',
+                  onClick: () => {
+                    setQuery('');
+                    clearFilters();
+                  },
+                }}
+                secondaryAction={{
+                  label: '返回首页',
+                  onClick: () => navigate('/'),
+                }}
+              />
+            </div>
           )}
         </div>
       )}

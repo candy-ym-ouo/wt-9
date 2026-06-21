@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useResponsive } from '../hooks/useResponsive';
+import BottomSheet from '../components/BottomSheet';
+import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import { colors, spacing, fontSize, radius } from '../styles/theme';
 
 interface Rehearsal {
   id: number;
@@ -141,6 +146,7 @@ export default function CalendarPage() {
   const [copyingId, setCopyingId] = useState<number | null>(null);
   const [copyingAll, setCopyingAll] = useState(false);
   const { user, isDirector, isAdmin } = useAuth();
+  const { isMobile, isTablet } = useResponsive();
 
   const load = async () => {
     const params: Parameters<typeof api.rehearsals.list>[0] = {};
@@ -523,99 +529,170 @@ export default function CalendarPage() {
 
   const canEdit = isDirector || isAdmin;
 
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <h2 style={{ margin: 0, color: '#e0e0e0' }}>排练日历</h2>
-          {!canEdit && (
-            <span style={{
-              padding: '4px 10px',
-              background: 'rgba(155, 89, 182, 0.2)',
-              border: '1px solid #9b59b6',
-              color: '#9b59b6',
-              borderRadius: 12,
-              fontSize: 12,
-            }}>
-              🔒 仅导演和管理员可编辑
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
+  const headerActions = (
+    <div style={{ display: 'flex', gap: isMobile ? spacing.xs : spacing.sm }}>
+      <button
+        onClick={() => (isMobile ? setShowFilters(true) : setShowFilters(!showFilters))}
+        style={{
+          padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '8px 16px',
+          background: showFilters ? `${colors.accent}20` : 'transparent',
+          border: `1px solid ${colors.accent}`,
+          borderRadius: radius.md,
+          color: colors.accent,
+          cursor: 'pointer',
+          fontSize: isMobile ? fontSize.sm : 14,
+          minHeight: isMobile ? 40 : 0,
+          minWidth: isMobile ? 40 : 0,
+          position: 'relative',
+        }}
+        title="筛选"
+      >
+        {isMobile ? '🔍' : `🔍 筛选`}
+        {hasActiveFilters && (
+          <span
             style={{
-              padding: '8px 16px',
-              background: showFilters ? 'rgba(52, 152, 219, 0.2)' : 'transparent',
-              border: '1px solid #3498db',
-              borderRadius: 6,
-              color: '#3498db',
-              cursor: 'pointer',
-              fontSize: 14,
+              position: isMobile ? 'absolute' : 'relative',
+              top: isMobile ? 4 : 'auto',
+              right: isMobile ? 4 : 'auto',
+              marginLeft: isMobile ? 0 : 6,
+              width: isMobile ? 8 : undefined,
+              height: isMobile ? 8 : undefined,
+              borderRadius: '50%',
+              background: colors.primary,
+              display: isMobile ? 'inline-block' : 'inline',
+              color: isMobile ? 'transparent' : colors.primary,
             }}
           >
-            🔍 筛选 {hasActiveFilters && <span style={{ marginLeft: 6, color: '#e74c3c' }}>●</span>}
-          </button>
-          {canEdit && (
-            <button
-              onClick={toggleCopyPanel}
-              style={{
-                padding: '8px 16px',
-                background: showCopyPanel ? 'rgba(155, 89, 182, 0.2)' : 'transparent',
-                border: '1px solid #9b59b6',
-                borderRadius: 6,
-                color: '#9b59b6',
-                cursor: 'pointer',
-                fontSize: 14,
-              }}
-            >
-              📋 复制上周安排
-            </button>
-          )}
-          {canEdit && (
-            <button
-              onClick={() => showForm ? resetForm() : setShowForm(true)}
-              style={{
-                padding: '8px 16px',
-                background: '#e74c3c',
-                border: 'none',
-                borderRadius: 6,
-                color: '#fff',
-                cursor: 'pointer',
-                fontSize: 14,
-              }}
-            >
-              {showForm ? '取消' : '+ 新排练'}
-            </button>
-          )}
-        </div>
-      </div>
+            {!isMobile && '●'}
+          </span>
+        )}
+      </button>
+      {canEdit && (
+        <button
+          onClick={() => (isMobile ? setShowCopyPanel(true) : toggleCopyPanel())}
+          style={{
+            padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '8px 16px',
+            background: showCopyPanel ? `${colors.secondary}20` : 'transparent',
+            border: `1px solid ${colors.secondary}`,
+            borderRadius: radius.md,
+            color: colors.secondary,
+            cursor: 'pointer',
+            fontSize: isMobile ? fontSize.sm : 14,
+            minHeight: isMobile ? 40 : 0,
+            minWidth: isMobile ? 40 : 0,
+          }}
+          title="复制上周安排"
+        >
+          {isMobile ? '📋' : '📋 复制上周'}
+        </button>
+      )}
+      {canEdit && (
+        <button
+          onClick={() =>
+            isMobile
+              ? setShowForm(true)
+              : showForm
+                ? resetForm()
+                : setShowForm(true)
+          }
+          style={{
+            padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '8px 16px',
+            background: colors.primary,
+            border: 'none',
+            borderRadius: radius.md,
+            color: colors.textInverse,
+            cursor: 'pointer',
+            fontSize: isMobile ? fontSize.sm : 14,
+            fontWeight: 600,
+            minHeight: isMobile ? 40 : 0,
+            minWidth: isMobile ? 40 : 0,
+          }}
+          title={isMobile ? '新建排练' : showForm ? '取消' : '新建排练'}
+        >
+          {isMobile ? (showForm ? '✕' : '➕') : showForm ? '取消' : '+ 新排练'}
+        </button>
+      )}
+    </div>
+  );
 
-      <input
-        type="text"
-        value={keyword}
-        onChange={(e) => handleKeywordChange(e.target.value)}
-        placeholder="搜索排练标题、地点、参与人..."
-        style={{
-          width: '100%',
-          padding: '10px 14px',
-          background: '#1a1a1a',
-          border: '1px solid #333',
-          borderRadius: 8,
-          color: '#e0e0e0',
-          fontSize: 14,
-          outline: 'none',
-          marginBottom: 20,
-          boxSizing: 'border-box',
-        }}
+  return (
+    <div>
+      <PageHeader
+        title="排练日历"
+        subtitle={
+          !canEdit ? '🔒 仅导演和管理员可编辑' : undefined
+        }
+        rightAction={headerActions}
+        sticky
       />
 
-      {showCopyPanel && canEdit && (
+      {!isMobile && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: spacing.xxl,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+            <h2 style={{ margin: 0, color: colors.text }}>排练日历</h2>
+            {!canEdit && (
+              <span
+                style={{
+                  padding: '4px 10px',
+                  background: `${colors.secondary}20`,
+                  border: `1px solid ${colors.secondary}`,
+                  color: colors.secondary,
+                  borderRadius: radius.full,
+                  fontSize: fontSize.sm,
+                }}
+              >
+                🔒 仅导演和管理员可编辑
+              </span>
+            )}
+          </div>
+          {headerActions}
+        </div>
+      )}
+
+      <div style={{ marginBottom: isMobile ? spacing.lg : 20 }}>
+        <input
+          type="text"
+          value={keyword}
+          onChange={(e) => handleKeywordChange(e.target.value)}
+          placeholder="搜索排练标题、地点、参与人..."
+          style={{
+            width: '100%',
+            padding: isMobile
+              ? `${spacing.md + 2}px ${spacing.md + 2}px`
+              : '10px 14px',
+            background: colors.bgSecondary,
+            border: `1px solid ${colors.border}`,
+            borderRadius: radius.lg,
+            color: colors.text,
+            fontSize: isMobile ? fontSize.lg : 14,
+            outline: 'none',
+            boxSizing: 'border-box',
+            transition: 'all 0.15s',
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = colors.primary;
+            e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.primary}20`;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = colors.border;
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        />
+      </div>
+
+      {!isMobile && showCopyPanel && canEdit && (
         <div style={{
-          background: '#1a1a1a',
+          background: colors.bgSecondary,
           padding: 20,
-          borderRadius: 8,
-          border: '1px solid #9b59b6',
+          borderRadius: radius.lg,
+          border: `1px solid ${colors.secondary}`,
           marginBottom: 24,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -765,15 +842,22 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {showFilters && (
+      {!isMobile && showFilters && (
         <div style={{
-          background: '#1a1a1a',
+          background: colors.bgSecondary,
           padding: 16,
-          borderRadius: 8,
-          border: '1px solid #333',
+          borderRadius: radius.lg,
+          border: `1px solid ${colors.border}`,
           marginBottom: 24,
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, alignItems: 'end' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isTablet ? '1fr 1fr' : '1fr 1fr 1fr 1fr',
+              gap: 12,
+              alignItems: 'end',
+            }}
+          >
             <div>
               <div style={{ color: '#888', fontSize: 12, marginBottom: 6 }}>📍 地点</div>
               <input
@@ -934,17 +1018,20 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {showForm && canEdit && (
-        <form onSubmit={handleSubmit} style={{
-          background: '#1a1a1a',
-          padding: 20,
-          borderRadius: 8,
-          border: '1px solid #333',
-          marginBottom: 24,
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 12,
-        }}>
+      {!isMobile && showForm && canEdit && (
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            background: colors.bgSecondary,
+            padding: 20,
+            borderRadius: radius.lg,
+            border: `1px solid ${colors.border}`,
+            marginBottom: 24,
+            display: 'grid',
+            gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr',
+            gap: 12,
+          }}
+        >
           <h3 style={{ gridColumn: '1 / -1', margin: '0 0 8px', color: '#e0e0e0', fontSize: 16 }}>
             {editingId ? '✏️ 编辑排练' : '➕ 创建新排练'}
           </h3>
@@ -1119,28 +1206,46 @@ export default function CalendarPage() {
         </form>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: isMobile ? spacing.md : 12,
+        }}
+      >
         {filteredRehearsals.map((r, idx) => {
           const isHighlighted = highlightedRehearsalId === r.id;
           return (
             <div
               key={r.id}
-              ref={(el) => { rehearsalRefs.current[r.id] = el; }}
+              ref={(el) => {
+                rehearsalRefs.current[r.id] = el;
+              }}
               style={{
-                background: '#1a1a1a',
-                borderRadius: 8,
-                border: '1px solid #333',
+                background: colors.bgSecondary,
+                borderRadius: isMobile ? radius.lg : 8,
+                border: `1px solid ${colors.border}`,
                 borderLeft: `4px solid ${colorPool[idx % colorPool.length]}`,
-                padding: 16,
-                ...(isHighlighted ? { borderColor: '#f39c12', boxShadow: '0 0 12px rgba(243,156,18,0.4)' } : {}),
+                padding: isMobile ? spacing.md : 16,
+                ...(isHighlighted
+                  ? { borderColor: colors.warning, boxShadow: `0 0 12px ${colors.warning}40` }
+                  : {}),
                 transition: 'all 0.3s ease',
-                scrollMarginTop: 80,
+                scrollMarginTop: isMobile ? 120 : 80,
               }}
             >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <h3 style={{ margin: 0, color: '#e0e0e0', fontSize: 16 }}>{r.title}</h3>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                justifyContent: 'space-between',
+                alignItems: isMobile ? 'flex-start' : 'flex-start',
+                gap: isMobile ? spacing.sm : 0,
+              }}
+            >
+              <div style={{ flex: 1, width: isMobile ? '100%' : undefined }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, color: colors.text, fontSize: isMobile ? fontSize.md : 16 }}>{r.title}</h3>
                   {r.hasConflict && (
                     <span style={{
                       padding: '2px 8px',
@@ -1517,21 +1622,638 @@ export default function CalendarPage() {
                 )}
               </div>
               {canEdit && (
-                <div style={{ display: 'flex', gap: 6, marginLeft: 12 }}>
-                  <button onClick={() => startEdit(r)} style={editBtnStyle}>编辑</button>
-                  <button onClick={() => handleDelete(r.id)} style={deleteBtnStyle}>删除</button>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: isMobile ? spacing.sm : 6,
+                    marginLeft: isMobile ? 0 : 12,
+                    alignSelf: isMobile ? 'flex-end' : 'flex-start',
+                    width: isMobile ? '100%' : undefined,
+                    justifyContent: isMobile ? 'flex-end' : undefined,
+                  }}
+                >
+                  <button
+                    onClick={() => (isMobile ? setShowForm(true) : null, startEdit(r))}
+                    style={{
+                      ...editBtnStyle,
+                      padding: isMobile ? `${spacing.sm + 2}px ${spacing.md}px` : editBtnStyle.padding,
+                      fontSize: isMobile ? fontSize.sm : editBtnStyle.fontSize as number,
+                      minHeight: isMobile ? 40 : 0,
+                    }}
+                  >
+                    {isMobile ? '✏️ 编辑' : '编辑'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(r.id)}
+                    style={{
+                      ...deleteBtnStyle,
+                      padding: isMobile ? `${spacing.sm + 2}px ${spacing.md}px` : deleteBtnStyle.padding,
+                      fontSize: isMobile ? fontSize.sm : deleteBtnStyle.fontSize as number,
+                      minHeight: isMobile ? 40 : 0,
+                    }}
+                  >
+                    {isMobile ? '🗑️ 删除' : '删除'}
+                  </button>
                 </div>
               )}
             </div>
           </div>
           );
         })}
-        {rehearsals.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#555', padding: 48 }}>
-            {hasActiveFilters ? '没有符合筛选条件的排练' : '暂无排练安排'}
-          </div>
+        {filteredRehearsals.length === 0 && (
+          <EmptyState
+            icon="📅"
+            title={
+              hasActiveFilters
+                ? '没有符合筛选条件的排练'
+                : '暂无排练安排'
+            }
+            description={
+              hasActiveFilters
+                ? '请尝试调整筛选条件'
+                : canEdit
+                  ? '点击右上角按钮创建第一个排练'
+                  : '暂无排练数据，请等待导演安排'
+            }
+            action={
+              canEdit && !hasActiveFilters
+                ? {
+                    label: '➕ 创建排练',
+                    onClick: () => setShowForm(true),
+                    variant: 'primary' as const,
+                  }
+                : undefined
+            }
+          />
         )}
       </div>
+
+      {isMobile && (
+        <BottomSheet
+          isOpen={showForm && canEdit}
+          onClose={resetForm}
+          title={editingId ? '✏️ 编辑排练' : '➕ 创建新排练'}
+        >
+          <form
+            onSubmit={handleSubmit}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: spacing.md,
+            }}
+          >
+            <input
+              placeholder="标题"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              required
+              style={{ ...inputStyle, fontSize: fontSize.lg, padding: `${spacing.md}px ${spacing.md}px` }}
+            />
+            <input
+              placeholder="地点"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              style={{
+                ...inputStyle,
+                fontSize: fontSize.lg,
+                padding: `${spacing.md}px ${spacing.md}px`,
+                borderColor: conflictInfo?.locationConflicts?.length
+                  ? colors.danger
+                  : undefined,
+                boxShadow: conflictInfo?.locationConflicts?.length
+                  ? `0 0 0 2px ${colors.danger}20`
+                  : undefined,
+              }}
+            />
+            <input
+              type="datetime-local"
+              value={form.startTime}
+              onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+              required
+              style={{
+                ...inputStyle,
+                fontSize: fontSize.lg,
+                padding: `${spacing.md}px ${spacing.md}px`,
+              }}
+            />
+            <input
+              type="datetime-local"
+              value={form.endTime}
+              onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+              required
+              style={{
+                ...inputStyle,
+                fontSize: fontSize.lg,
+                padding: `${spacing.md}px ${spacing.md}px`,
+              }}
+            />
+            <textarea
+              placeholder="描述"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              style={{
+                ...inputStyle,
+                minHeight: 80,
+                fontSize: fontSize.lg,
+                padding: `${spacing.md}px ${spacing.md}px`,
+              }}
+            />
+
+            <div>
+              <div style={{ color: colors.textMuted, fontSize: fontSize.sm, marginBottom: spacing.sm }}>
+                👥 参与人（可选）
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
+                {users.map((u) => (
+                  <label
+                    key={u.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: `${spacing.sm}px ${spacing.md}px`,
+                      background: form.participantIds.includes(u.id)
+                        ? `${colors.primary}20`
+                        : colors.bgTertiary,
+                      border: `1px solid ${
+                        form.participantIds.includes(u.id) ? colors.primary : colors.borderLight
+                      }`,
+                      borderRadius: radius.full,
+                      cursor: 'pointer',
+                      fontSize: fontSize.sm,
+                      color: colors.text,
+                      minHeight: 40,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.participantIds.includes(u.id)}
+                      onChange={() => toggleParticipant(u.id)}
+                      style={{ accentColor: colors.primary }}
+                    />
+                    {u.displayName || u.username}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ color: colors.textMuted, fontSize: fontSize.sm, marginBottom: spacing.sm }}>
+                📁 关联素材（可选）
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
+                {materials.length === 0 && (
+                  <span style={{ color: colors.textFaint, fontSize: fontSize.sm }}>
+                    暂无素材
+                  </span>
+                )}
+                {materials.map((m) => (
+                  <label
+                    key={m.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: `${spacing.sm}px ${spacing.md}px`,
+                      background: form.materialIds.includes(m.id)
+                        ? `${colors.accent}20`
+                        : colors.bgTertiary,
+                      border: `1px solid ${
+                        form.materialIds.includes(m.id) ? colors.accent : colors.borderLight
+                      }`,
+                      borderRadius: radius.full,
+                      cursor: 'pointer',
+                      fontSize: fontSize.sm,
+                      color: colors.text,
+                      maxWidth: '100%',
+                      minHeight: 40,
+                    }}
+                    title={m.originalName}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.materialIds.includes(m.id)}
+                      onChange={() => toggleMaterial(m.id)}
+                      style={{ accentColor: colors.accent }}
+                    />
+                    <span className="ellipsis" style={{ maxWidth: 200 }}>
+                      {m.originalName}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {checkingConflict && (
+              <div
+                style={{
+                  padding: spacing.md,
+                  background: `${colors.info}10`,
+                  border: `1px solid ${colors.info}`,
+                  borderRadius: radius.md,
+                  color: colors.info,
+                  fontSize: fontSize.sm,
+                }}
+              >
+                ⏳ 正在检查时间、地点和参与人冲突...
+              </div>
+            )}
+
+            {!checkingConflict && conflictInfo && conflictInfo.hasConflict && (
+              <div
+                style={{
+                  padding: spacing.md,
+                  background: `${colors.danger}10`,
+                  border: `1px solid ${colors.danger}`,
+                  borderRadius: radius.md,
+                  fontSize: fontSize.sm,
+                }}
+              >
+                <div style={{ color: colors.danger, fontWeight: 600, marginBottom: 6 }}>
+                  ⚠️ 检测到冲突
+                </div>
+                {conflictInfo.locationConflicts?.length ? (
+                  <div style={{ color: colors.text, marginTop: 4 }}>
+                    📍 地点冲突：{conflictInfo.locationConflicts.map((r) => r.title).join('、')}
+                  </div>
+                ) : null}
+                {conflictInfo.timeConflicts?.length ? (
+                  <div style={{ color: colors.text, marginTop: 4 }}>
+                    📅 时间冲突：{conflictInfo.timeConflicts.map((r) => r.title).join('、')}
+                  </div>
+                ) : null}
+                {conflictInfo.participantConflicts?.length ? (
+                  <div style={{ color: colors.text, marginTop: 4 }}>
+                    👥 参与人冲突：{conflictInfo.participantConflicts.map((p) => p.userName || '用户').join('、')}
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {!checkingConflict &&
+              conflictInfo &&
+              !conflictInfo.hasConflict &&
+              form.startTime &&
+              form.endTime && (
+                <div
+                  style={{
+                    padding: spacing.md,
+                    background: `${colors.success}10`,
+                    border: `1px solid ${colors.success}`,
+                    borderRadius: radius.md,
+                    color: colors.success,
+                    fontSize: fontSize.sm,
+                  }}
+                >
+                  ✅ 无时间冲突，参与人都空闲
+                </div>
+              )}
+
+            {error && (
+              <div
+                style={{
+                  padding: spacing.md,
+                  background: `${colors.danger}20`,
+                  border: `1px solid ${colors.danger}`,
+                  borderRadius: radius.md,
+                  color: colors.danger,
+                  fontSize: fontSize.sm,
+                }}
+              >
+                ❌ {error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.sm }}>
+              <button
+                type="button"
+                onClick={resetForm}
+                style={{
+                  flex: 1,
+                  padding: `${spacing.md}px`,
+                  background: 'transparent',
+                  border: `1px solid ${colors.borderLight}`,
+                  borderRadius: radius.md,
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  minHeight: 48,
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                style={{
+                  flex: 2,
+                  padding: `${spacing.md}px`,
+                  background: colors.primary,
+                  border: 'none',
+                  borderRadius: radius.md,
+                  color: colors.textInverse,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  fontWeight: 600,
+                  minHeight: 48,
+                }}
+              >
+                {editingId ? '保存修改' : '创建排练'}
+              </button>
+            </div>
+          </form>
+        </BottomSheet>
+      )}
+
+      {isMobile && (
+        <BottomSheet
+          isOpen={showFilters}
+          onClose={() => setShowFilters(false)}
+          title="🔍 筛选排练"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
+            <div>
+              <label style={{ color: colors.textMuted, fontSize: fontSize.sm, marginBottom: spacing.sm, display: 'block' }}>
+                📍 地点
+              </label>
+              <input
+                placeholder="输入地点关键词"
+                value={filters.location}
+                onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                style={{ ...inputStyle, fontSize: fontSize.lg, padding: `${spacing.md}px ${spacing.md}px` }}
+              />
+            </div>
+            <div>
+              <label style={{ color: colors.textMuted, fontSize: fontSize.sm, marginBottom: spacing.sm, display: 'block' }}>
+                👤 演员
+              </label>
+              <select
+                value={filters.participantId ?? ''}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    participantId: e.target.value ? Number(e.target.value) : null,
+                  })
+                }
+                style={{ ...inputStyle, fontSize: fontSize.lg, padding: `${spacing.md}px ${spacing.md}px` }}
+              >
+                <option value="">全部演员</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.displayName || u.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ color: colors.textMuted, fontSize: fontSize.sm, marginBottom: spacing.sm, display: 'block' }}>
+                ✅ 签到状态
+              </label>
+              <select
+                value={filters.attendanceStatus}
+                onChange={(e) => setFilters({ ...filters, attendanceStatus: e.target.value })}
+                style={{ ...inputStyle, fontSize: fontSize.lg, padding: `${spacing.md}px ${spacing.md}px` }}
+              >
+                <option value="">全部状态</option>
+                <option value="present">出勤</option>
+                <option value="absent">缺席</option>
+                <option value="late">迟到</option>
+                <option value="pending">未签到</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ color: colors.textMuted, fontSize: fontSize.sm, marginBottom: spacing.sm, display: 'block' }}>
+                ⏰ 时间段
+              </label>
+              <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'center' }}>
+                <input
+                  type="time"
+                  value={filters.timeSlotStart}
+                  onChange={(e) => setFilters({ ...filters, timeSlotStart: e.target.value })}
+                  style={{ ...inputStyle, flex: 1, fontSize: fontSize.lg, padding: `${spacing.md}px ${spacing.md}px` }}
+                />
+                <span style={{ color: colors.textMuted }}>-</span>
+                <input
+                  type="time"
+                  value={filters.timeSlotEnd}
+                  onChange={(e) => setFilters({ ...filters, timeSlotEnd: e.target.value })}
+                  style={{ ...inputStyle, flex: 1, fontSize: fontSize.lg, padding: `${spacing.md}px ${spacing.md}px` }}
+                />
+              </div>
+            </div>
+
+            {availableTags.length > 0 && (
+              <div>
+                <div style={{ color: colors.textMuted, fontSize: fontSize.sm, marginBottom: spacing.sm }}>
+                  🏷️ 标签筛选 {selectedTagIds.length > 0 && `(${selectedTagIds.length})`}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {availableTags.map((tag) => {
+                    const selected = selectedTagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        onClick={() => {
+                          setSelectedTagIds((prev) =>
+                            selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]
+                          );
+                        }}
+                        style={{
+                          padding: `${spacing.sm}px ${spacing.md}px`,
+                          borderRadius: radius.full,
+                          border: `1px solid ${selected ? tag.color : colors.borderLight}`,
+                          background: selected ? `${tag.color}20` : 'transparent',
+                          color: selected ? tag.color : colors.textSecondary,
+                          fontSize: fontSize.sm,
+                          cursor: 'pointer',
+                          minHeight: 40,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: tag.color,
+                            display: 'inline-block',
+                            marginRight: 6,
+                          }}
+                        />
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ color: colors.textFaint, fontSize: fontSize.sm }}>
+              当前筛选结果：<span style={{ color: colors.info }}>{filteredRehearsals.length}</span> 条排练
+            </div>
+
+            <div style={{ display: 'flex', gap: spacing.md }}>
+              <button
+                onClick={() => {
+                  resetFilters();
+                  setShowFilters(false);
+                }}
+                style={{
+                  flex: 1,
+                  padding: `${spacing.md}px`,
+                  background: 'transparent',
+                  border: `1px solid ${colors.borderLight}`,
+                  borderRadius: radius.md,
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  minHeight: 48,
+                }}
+              >
+                重置
+              </button>
+              <button
+                onClick={() => {
+                  load();
+                  setShowFilters(false);
+                }}
+                style={{
+                  flex: 2,
+                  padding: `${spacing.md}px`,
+                  background: colors.primary,
+                  border: 'none',
+                  borderRadius: radius.md,
+                  color: colors.textInverse,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  fontWeight: 600,
+                  minHeight: 48,
+                }}
+              >
+                应用筛选
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {isMobile && (
+        <BottomSheet
+          isOpen={showCopyPanel && canEdit}
+          onClose={() => setShowCopyPanel(false)}
+          title="📋 复制上周安排"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: spacing.sm,
+                marginBottom: spacing.sm,
+              }}
+            >
+              <button
+                onClick={handleCopyAll}
+                disabled={copyingAll || lastWeekRehearsals.length === 0}
+                style={{
+                  flex: 1,
+                  padding: `${spacing.md}px`,
+                  background: colors.secondary,
+                  border: 'none',
+                  borderRadius: radius.md,
+                  color: colors.textInverse,
+                  cursor:
+                    copyingAll || lastWeekRehearsals.length === 0
+                      ? 'not-allowed'
+                      : 'pointer',
+                  fontSize: fontSize.md,
+                  minHeight: 48,
+                  opacity: copyingAll || lastWeekRehearsals.length === 0 ? 0.6 : 1,
+                }}
+              >
+                {copyingAll ? '复制中...' : '一键复制全部'}
+              </button>
+            </div>
+
+            {loadingLastWeek && (
+              <div style={{ textAlign: 'center', padding: spacing.xxxl, color: colors.textMuted }}>
+                ⏳ 加载上周排练中...
+              </div>
+            )}
+
+            {!loadingLastWeek && lastWeekRehearsals.length === 0 && (
+              <EmptyState
+                icon="📭"
+                title="上周没有排练安排"
+                description="没有可以复制的内容"
+              />
+            )}
+
+            {!loadingLastWeek && lastWeekRehearsals.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+                {lastWeekRehearsals.map((r, idx) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      background: colors.bgTertiary,
+                      borderRadius: radius.md,
+                      padding: spacing.md,
+                      borderLeft: `3px solid ${colorPool[idx % colorPool.length]}`,
+                    }}
+                  >
+                    <div style={{ color: colors.text, fontWeight: 500, marginBottom: 4 }}>
+                      {r.title}
+                    </div>
+                    <div style={{ fontSize: fontSize.sm, color: colors.textMuted }}>
+                      {formatDate(r.startTime).slice(5)} → {formatDate(r.endTime).slice(10)}
+                      {r.location && <span style={{ marginLeft: 8 }}>📍 {r.location}</span>}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: spacing.sm,
+                        marginTop: spacing.md,
+                      }}
+                    >
+                      <button
+                        onClick={() => handleCopyToForm(r)}
+                        style={{
+                          flex: 1,
+                          padding: `${spacing.sm}px`,
+                          background: 'transparent',
+                          border: `1px solid ${colors.info}`,
+                          borderRadius: radius.md,
+                          color: colors.info,
+                          cursor: 'pointer',
+                          fontSize: fontSize.sm,
+                          minHeight: 40,
+                        }}
+                      >
+                        编辑后创建
+                      </button>
+                      <button
+                        onClick={() => handleCopySingle(r.id)}
+                        disabled={copyingId === r.id}
+                        style={{
+                          flex: 1,
+                          padding: `${spacing.sm}px`,
+                          background: colors.success,
+                          border: 'none',
+                          borderRadius: radius.md,
+                          color: colors.textInverse,
+                          cursor: copyingId === r.id ? 'not-allowed' : 'pointer',
+                          fontSize: fontSize.sm,
+                          minHeight: 40,
+                          opacity: copyingId === r.id ? 0.6 : 1,
+                        }}
+                      >
+                        {copyingId === r.id ? '复制中...' : '直接复制'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </BottomSheet>
+      )}
     </div>
   );
 }
