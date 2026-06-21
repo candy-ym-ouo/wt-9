@@ -80,9 +80,12 @@ export default function MaterialsPage() {
   const [uploadCustomCat, setUploadCustomCat] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mobileFileRef = useRef<HTMLInputElement>(null);
+  const [showMobileUpload, setShowMobileUpload] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const { isDirector, user } = useAuth();
   const isAdmin = user?.role === 'admin' || isDirector;
-  const canEdit = isAdmin || isDirector || true;
+  const canEdit = isAdmin || isDirector;
 
   const [detailMaterial, setDetailMaterial] = useState<Material | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string; refs?: { rehearsals: number; annotations: number; total: number } } | null>(null);
@@ -209,6 +212,8 @@ export default function MaterialsPage() {
 
   const resetUploadForm = () => {
     if (fileRef.current) fileRef.current.value = '';
+    if (mobileFileRef.current) mobileFileRef.current.value = '';
+    setPendingFile(null);
     setUploadDesc('');
     setUploadTags('');
     setUploadCustomCat('');
@@ -216,8 +221,12 @@ export default function MaterialsPage() {
     setUploadDownloadRoles([]);
   };
 
+  const handleFileSelect = (file: File) => {
+    setPendingFile(file);
+  };
+
   const handleUpload = async () => {
-    const file = fileRef.current?.files?.[0];
+    const file = pendingFile || fileRef.current?.files?.[0];
     if (!file) return;
     setUploading(true);
 
@@ -236,6 +245,7 @@ export default function MaterialsPage() {
 
       await api.materials.upload(file, buildUploadParams());
       resetUploadForm();
+      setPendingFile(null);
       load();
       loadMeta();
     } catch (e) {
@@ -401,7 +411,13 @@ export default function MaterialsPage() {
         rightAction={
           canEdit ? (
             <button
-              onClick={() => fileRef.current?.click()}
+              onClick={() => {
+                if (isMobile) {
+                  setShowMobileUpload(true);
+                } else {
+                  fileRef.current?.click();
+                }
+              }}
               style={{
                 padding: isMobile ? `${spacing.sm}px ${spacing.md}px` : '10px 20px',
                 background: colors.primary,
@@ -666,6 +682,232 @@ export default function MaterialsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {isMobile && canEdit && (
+        <BottomSheet
+          isOpen={showMobileUpload}
+          onClose={() => setShowMobileUpload(false)}
+          title="上传素材"
+        >
+          <input
+            type="file"
+            ref={mobileFileRef}
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleFileSelect(file);
+              }
+            }}
+          />
+          <div style={{
+            padding: `0 ${spacing.md}px ${spacing.xl}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: spacing.lg,
+          }}>
+            <button
+              onClick={() => mobileFileRef.current?.click()}
+              style={{
+                padding: `${spacing.xl}px ${spacing.md}px`,
+                background: pendingFile ? `${colors.primary}20` : colors.bgTertiary,
+                border: `2px dashed ${pendingFile ? colors.primary : colors.borderLight}`,
+                borderRadius: radius.lg,
+                color: pendingFile ? colors.primary : colors.text,
+                cursor: 'pointer',
+                fontSize: fontSize.md,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: spacing.sm,
+                minHeight: 120,
+                justifyContent: 'center',
+                transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 40 }}>{pendingFile ? '✅' : '📤'}</span>
+              <span style={{ fontWeight: 600 }}>
+                {pendingFile ? '已选择文件' : '点击选择文件'}
+              </span>
+              {pendingFile ? (
+                <span style={{
+                  fontSize: fontSize.sm,
+                  color: colors.textSecondary,
+                  maxWidth: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  📄 {pendingFile.name} ({formatSize(pendingFile.size)})
+                </span>
+              ) : (
+                <span style={{ fontSize: fontSize.sm, color: colors.textMuted }}>支持图片、视频、音频、PDF 等格式</span>
+              )}
+            </button>
+
+            <div>
+              <label style={{
+                fontSize: fontSize.sm,
+                color: colors.textSecondary,
+                fontWeight: 500,
+                marginBottom: spacing.sm,
+                display: 'block',
+              }}>分类（多选）</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs }}>
+                {availableCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => toggleUploadCategory(cat)}
+                    style={{
+                      ...chipStyle,
+                      minHeight: 36,
+                      padding: `${spacing.sm}px ${spacing.md}px`,
+                      fontSize: fontSize.sm,
+                      background: uploadCategories.includes(cat) ? colors.primary : colors.bgTertiary,
+                      color: uploadCategories.includes(cat) ? colors.textInverse : colors.textSecondary,
+                      borderColor: uploadCategories.includes(cat) ? colors.primary : colors.border,
+                      borderRadius: radius.md,
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+                <input
+                  placeholder="+新分类"
+                  value={uploadCustomCat}
+                  onChange={(e) => setUploadCustomCat(e.target.value)}
+                  style={{
+                    ...inputStyle,
+                    width: 80,
+                    padding: `${spacing.sm}px ${spacing.md}px`,
+                    fontSize: fontSize.sm,
+                    minHeight: 36,
+                    borderRadius: radius.md,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{
+                fontSize: fontSize.sm,
+                color: colors.textSecondary,
+                fontWeight: 500,
+                marginBottom: spacing.sm,
+                display: 'block',
+              }}>标签（逗号分隔）</label>
+              <input
+                placeholder="如: 第一幕,定稿"
+                value={uploadTags}
+                onChange={(e) => setUploadTags(e.target.value)}
+                style={{
+                  ...inputStyle,
+                  width: '100%',
+                  padding: `${spacing.md}px ${spacing.md}px`,
+                  fontSize: fontSize.md,
+                  minHeight: 48,
+                  borderRadius: radius.md,
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{
+                fontSize: fontSize.sm,
+                color: colors.textSecondary,
+                fontWeight: 500,
+                marginBottom: spacing.sm,
+                display: 'block',
+              }}>描述</label>
+              <input
+                placeholder="描述信息"
+                value={uploadDesc}
+                onChange={(e) => setUploadDesc(e.target.value)}
+                style={{
+                  ...inputStyle,
+                  width: '100%',
+                  padding: `${spacing.md}px ${spacing.md}px`,
+                  fontSize: fontSize.md,
+                  minHeight: 48,
+                  borderRadius: radius.md,
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{
+                fontSize: fontSize.sm,
+                color: colors.textSecondary,
+                fontWeight: 500,
+                marginBottom: spacing.sm,
+                display: 'block',
+              }}>下载权限（空=所有人）</label>
+              <div style={{ display: 'flex', gap: spacing.xs, flexWrap: 'wrap' }}>
+                {ALL_ROLES.map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => toggleUploadDownloadRole(role)}
+                    style={{
+                      ...chipStyle,
+                      minHeight: 36,
+                      padding: `${spacing.sm}px ${spacing.md}px`,
+                      fontSize: fontSize.sm,
+                      background: uploadDownloadRoles.includes(role) ? colors.success : colors.bgTertiary,
+                      color: uploadDownloadRoles.includes(role) ? colors.textInverse : colors.textSecondary,
+                      borderColor: uploadDownloadRoles.includes(role) ? colors.success : colors.border,
+                      borderRadius: radius.md,
+                    }}
+                  >
+                    {ROLE_LABELS[role]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: spacing.md, paddingTop: spacing.md }}>
+              <button
+                onClick={() => setShowMobileUpload(false)}
+                style={{
+                  flex: 1,
+                  padding: `${spacing.md}px ${spacing.lg}px`,
+                  background: colors.bgTertiary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: radius.md,
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  fontSize: fontSize.md,
+                  minHeight: 48,
+                  fontWeight: 500,
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  handleUpload();
+                  setShowMobileUpload(false);
+                }}
+                disabled={uploading}
+                style={{
+                  flex: 1.5,
+                  padding: `${spacing.md}px ${spacing.lg}px`,
+                  background: colors.primary,
+                  border: 'none',
+                  borderRadius: radius.md,
+                  color: colors.textInverse,
+                  cursor: uploading ? 'not-allowed' : 'pointer',
+                  fontSize: fontSize.md,
+                  minHeight: 48,
+                  fontWeight: 600,
+                  opacity: uploading ? 0.6 : 1,
+                }}
+              >
+                {uploading ? '上传中...' : '上传'}
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>

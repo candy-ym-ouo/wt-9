@@ -130,7 +130,7 @@ export default function AnnotationsPage() {
   const { isMobile, isTablet } = useResponsive();
   const { user, isDirector } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'director';
-  const canEdit = isAdmin || isDirector || true;
+  const canEdit = isAdmin || isDirector;
 
   const saved = useMemo(() => loadFilterState(), []);
 
