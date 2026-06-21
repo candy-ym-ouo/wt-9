@@ -34,3 +34,10 @@ export { Subscription, SubscriptionTargetType, SubscriptionType } from './subscr
 export { Share, ShareTargetType, ShareStatus, AccessScope } from './share.entity';
 export { Visitor, VisitorStatus } from './visitor.entity';
 export { VisitorAccessLog, VisitorAction } from './visitor-access-log.entity';
+export {
+  PerformanceReview,
+  PerformanceReviewType,
+  PerformanceReviewStatus,
+  PerformanceReviewPriority,
+  PerformanceReviewSeverity,
+} from './performance-review.entity';

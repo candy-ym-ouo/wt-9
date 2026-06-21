@@ -22,7 +22,7 @@ export class SearchController {
     @Request() req?: any,
   ) {
     if ((!query || query.trim().length === 0) && !modules && !dateFrom && !dateTo && !tags) {
-      return { rehearsals: [], roles: [], annotations: [], materials: [], performances: [], scripts: [], tasks: [], total: 0 };
+      return { rehearsals: [], roles: [], annotations: [], materials: [], performances: [], scripts: [], tasks: [], performanceReviews: [], total: 0 };
     }
     return this.service.advancedSearch({
       query: query?.trim(),

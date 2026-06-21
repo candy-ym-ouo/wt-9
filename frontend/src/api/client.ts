@@ -48,6 +48,35 @@ async function downloadFile(id: number) {
   URL.revokeObjectURL(url);
 }
 
+async function downloadBlob(path: string, options?: RequestInit): Promise<{ blob: Blob; filename: string }> {
+  const token = localStorage.getItem('token');
+  const mergedHeaders: Record<string, string> = {
+    ...(options?.headers as Record<string, string> || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  const res = await fetch(`${BASE}${path}`, { ...options, headers: mergedHeaders });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+  const blob = await res.blob();
+  const contentDisposition = res.headers.get('content-disposition') || '';
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?["']?([^;"'\n]+)/i);
+  const filename = match ? decodeURIComponent(match[1]) : 'export';
+  return { blob, filename };
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   auth: {
     login: (username: string, password: string) =>
@@ -548,6 +577,27 @@ export const api = {
     getStatistics: (dramaId?: number) => {
       const params = dramaId ? `?dramaId=${dramaId}` : '';
       return request<any>(`/tags/statistics${params}`);
+    },
+  },
+  dataExport: {
+    getTypes: () =>
+      request<Array<{ type: string; label: string }>>('/data-export/types'),
+    getFormats: () =>
+      request<Array<{ format: string; label: string }>>('/data-export/formats'),
+    preview: (type: string, filter?: any) =>
+      request<{ total: number; preview: any[] }>('/data-export/preview', {
+        method: 'POST',
+        body: JSON.stringify({ type, filter: filter || {} }),
+      }),
+    exportAndDownload: async (type: string, format: string, filter?: any) => {
+      const { blob, filename } = await downloadBlob('/data-export/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type, format, filter: filter || {} }),
+      });
+      triggerDownload(blob, filename);
     },
   },
 };

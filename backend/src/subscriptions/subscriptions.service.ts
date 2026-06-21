@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import {
@@ -55,6 +55,7 @@ export class SubscriptionsService {
     private materialRepo: Repository<Material>,
     private notificationsService: NotificationsService,
     private auditLogsService: AuditLogsService,
+    @Inject(forwardRef(() => DramasService))
     private dramasService: DramasService,
   ) {}
 

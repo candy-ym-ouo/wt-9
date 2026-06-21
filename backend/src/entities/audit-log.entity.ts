@@ -122,6 +122,11 @@ export enum AuditAction {
   IMPORT_PREVIEW = 'import_preview',
   IMPORT_EXECUTE = 'import_execute',
   EXPORT_DATA = 'export_data',
+  CREATE_PERFORMANCE_REVIEW = 'create_performance_review',
+  UPDATE_PERFORMANCE_REVIEW = 'update_performance_review',
+  DELETE_PERFORMANCE_REVIEW = 'delete_performance_review',
+  UPDATE_PERFORMANCE_REVIEW_STATUS = 'update_performance_review_status',
+  ADD_PERFORMANCE_REVIEW_COMMENT = 'add_performance_review_comment',
 }
 
 export enum AuditModule {
@@ -150,6 +155,7 @@ export enum AuditModule {
   VISITOR = 'visitor',
   DATA_IMPORT = 'data_import',
   DATA_EXPORT = 'data_export',
+  PERFORMANCE_REVIEW = 'performance_review',
 }
 
 @Entity('audit_logs')

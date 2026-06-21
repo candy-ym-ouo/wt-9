@@ -39,6 +39,7 @@ import {
   Share,
   Visitor,
   VisitorAccessLog,
+  PerformanceReview,
 } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -69,6 +70,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { VisitorCollaborationModule } from './visitor-collaboration/visitor-collaboration.module';
 import { DataImportModule } from './data-import/data-import.module';
 import { DataExportModule } from './data-export/data-export.module';
+import { PerformanceReviewsModule } from './performance-reviews/performance-reviews.module';
 
 @Module({
   imports: [
@@ -114,8 +116,10 @@ import { DataExportModule } from './data-export/data-export.module';
         Share,
         Visitor,
         VisitorAccessLog,
+        PerformanceReview,
       ],
       synchronize: true,
+      logging: true,
     }),
     AuthModule,
     UsersModule,
@@ -146,6 +150,7 @@ import { DataExportModule } from './data-export/data-export.module';
     VisitorCollaborationModule,
     DataImportModule,
     DataExportModule,
+    PerformanceReviewsModule,
   ],
 })
 export class AppModule {}

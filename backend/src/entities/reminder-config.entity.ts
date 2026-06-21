@@ -22,10 +22,10 @@ export class ReminderConfig {
   @Column({ type: 'simple-enum', enum: ReminderType })
   type: ReminderType;
 
-  @Column({ type: 'simple-enum', enum: UserRole, array: true, default: [] })
+  @Column({ type: 'simple-json', default: '[]' })
   targetRoles: UserRole[];
 
-  @Column({ type: 'simple-enum', enum: ReminderChannel, array: true, default: [ReminderChannel.IN_APP] })
+  @Column({ type: 'simple-json', default: '["in_app"]' })
   channels: ReminderChannel[];
 
   @Column({ default: true })
